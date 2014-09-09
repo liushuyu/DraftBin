@@ -20,76 +20,7 @@
    with Sun's original "cc". */
 
 #include <memory.h>		 /* for memcpy() */
-#include <windows.h>
 #include "md5.h"
-#define S11 7
-#define S12 12
-#define S13 17
-#define S14 22
-#define S21 5
-#define S22 9
-#define S23 14
-#define S24 20
-#define S31 4
-#define S32 11
-#define S33 16
-#define S34 23
-#define S41 6
-#define S42 10
-#define S43 15
-#define S44 21
-
-#define a esi
-#define b edi
-#define c edx
-#define d ebx
-#define tmp1 eax
-#define tmp2 ecx
-
-#define x(i) [x+4*i]
-
-#define FF(a, b, c, d, x, s, ac) \
-  __asm mov tmp1,b \
-  __asm and tmp1,c \
-  __asm mov tmp2,b \
-  __asm not tmp2 \
-  __asm and tmp2,d \
-  __asm or tmp2,tmp1 \
-  __asm lea a,[tmp2+a+ac] \
-  __asm add a,x \
-  __asm rol a,s \
-  __asm add a,b 
-
-#define GG(a, b, c, d, x, s, ac) \
-  __asm mov tmp1,b \
-  __asm and tmp1,d \
-  __asm mov tmp2,d \
-  __asm not tmp2 \
-  __asm and tmp2,c \
-  __asm or tmp2,tmp1 \
-  __asm lea a,[tmp2+a+ac] \
-  __asm add a,x \
-  __asm rol a,s \
-  __asm add a,b 
-
-#define HH(a,b,c, d, x, s, ac) \
-  __asm mov tmp2,b \
-  __asm xor tmp2,c \
-  __asm xor tmp2,d \
-  __asm lea a,[tmp2+a+ac] \
-  __asm add a,x \
-  __asm rol a,s \
-  __asm add a,b
-
-#define II(a, b, c, d, x, s, ac) \
-  __asm mov tmp2,d \
-  __asm not tmp2 \
-  __asm or tmp2,b \
-  __asm xor tmp2,c \
-  __asm lea a,[tmp2+a+ac] \
-  __asm add a,x \
-  __asm rol a,s \
-  __asm add a,b
 
 #ifndef HIGHFIRST
 #define byteReverse(buf, len)	/* Nothing */
@@ -222,6 +153,17 @@ void MD5Final(digest, ctx)
 }
 
 
+/* The four core functions - F1 is optimized somewhat */
+
+/* #define F1(x, y, z) (x & y | ~x & z) */
+#define F1(x, y, z) (z ^ (x & (y ^ z)))
+#define F2(x, y, z) F1(z, x, y)
+#define F3(x, y, z) (x ^ y ^ z)
+#define F4(x, y, z) (y ^ (x | ~z))
+
+/* This is the central step in the MD5 algorithm. */
+#define MD5STEP(f, w, x, y, z, data, s) \
+	( w += f(x, y, z) + data,  w = w<<s | w>>(32-s),  w += x )
 
 /*
  * The core of the MD5 algorithm, this alters an existing MD5 hash to
@@ -231,109 +173,83 @@ void MD5Final(digest, ctx)
 void MD5Transform(buf, in)
     uint32 buf[4]; uint32 in[16];
 {
- DWORD x[16];
-  __asm {
-    //initial
-    mov a,0x67452301
-    mov b,0xefcdab89
-    mov c,0x98badcfe
-    mov d,0x10325476
-    //copy string from `in' to `buf'
-    //考虑到用API会影响寄存器，所以自己实现这一段内存拷贝
-    push esi
-    push edi
-      
-    xor ecx,ecx
-    mov esi,dword ptr [in]
-    lea edi,[x]
-ROLL:
-    mov eax,dword ptr [esi+ecx]
-    mov dword ptr [edi+ecx],eax
-    add ecx,4
-    cmp ecx,64
-    jb  ROLL
-      
-    pop edi
-    pop esi
-  }
-  
-  /* Round 1 */
-  FF(a, b, c, d, x( 0), S11, 0xd76aa478); /* 1 */
-  FF(d, a, b, c, x( 1), S12, 0xe8c7b756); /* 2 */
-  FF(c, d, a, b, x( 2), S13, 0x242070db); /* 3 */
-  FF(b, c, d, a, x( 3), S14, 0xc1bdceee); /* 4 */
-  FF(a, b, c, d, x( 4), S11, 0xf57c0faf); /* 5 */
-  FF(d, a, b, c, x( 5), S12, 0x4787c62a); /* 6 */
-  FF(c, d, a, b, x( 6), S13, 0xa8304613); /* 7 */
-  FF(b, c, d, a, x( 7), S14, 0xfd469501); /* 8 */
-  FF(a, b, c, d, x( 8), S11, 0x698098d8); /* 9 */
-  FF(d, a, b, c, x( 9), S12, 0x8b44f7af); /* 10 */
-  FF(c, d, a, b, x(10), S13, 0xffff5bb1); /* 11 */
-  FF(b, c, d, a, x(11), S14, 0x895cd7be); /* 12 */
-  FF(a, b, c, d, x(12), S11, 0x6b901122); /* 13 */
-  FF(d, a, b, c, x(13), S12, 0xfd987193); /* 14 */
-  FF(c, d, a, b, x(14), S13, 0xa679438e); /* 15 */
-  FF(b, c, d, a, x(15), S14, 0x49b40821); /* 16 */
-  
-  /* Round 2 */
-  GG (a, b, c, d, x( 1), S21, 0xf61e2562); /* 17 */
-  GG (d, a, b, c, x( 6), S22, 0xc040b340); /* 18 */
-  GG (c, d, a, b, x(11), S23, 0x265e5a51); /* 19 */
-  GG (b, c, d, a, x( 0), S24, 0xe9b6c7aa); /* 20 */
-  GG (a, b, c, d, x( 5), S21, 0xd62f105d); /* 21 */
-  GG (d, a, b, c, x(10), S22,  0x2441453); /* 22 */
-  GG (c, d, a, b, x(15), S23, 0xd8a1e681); /* 23 */
-  GG (b, c, d, a, x( 4), S24, 0xe7d3fbc8); /* 24 */
-  GG (a, b, c, d, x( 9), S21, 0x21e1cde6); /* 25 */
-  GG (d, a, b, c, x(14), S22, 0xc33707d6); /* 26 */
-  GG (c, d, a, b, x( 3), S23, 0xf4d50d87); /* 27 */
-  GG (b, c, d, a, x( 8), S24, 0x455a14ed); /* 28 */
-  GG (a, b, c, d, x(13), S21, 0xa9e3e905); /* 29 */
-  GG (d, a, b, c, x( 2), S22, 0xfcefa3f8); /* 30 */
-  GG (c, d, a, b, x( 7), S23, 0x676f02d9); /* 31 */
-  GG (b, c, d, a, x(12), S24, 0x8d2a4c8a); /* 32 */
-  
-  /* Round 3 */
-  HH (a, b, c, d, x( 5), S31, 0xfffa3942); /* 33 */
-  HH (d, a, b, c, x( 8), S32, 0x8771f681); /* 34 */
-  HH (c, d, a, b, x(11), S33, 0x6d9d6122); /* 35 */
-  HH (b, c, d, a, x(14), S34, 0xfde5380c); /* 36 */
-  HH (a, b, c, d, x( 1), S31, 0xa4beea44); /* 37 */
-  HH (d, a, b, c, x( 4), S32, 0x4bdecfa9); /* 38 */
-  HH (c, d, a, b, x( 7), S33, 0xf6bb4b60); /* 39 */
-  HH (b, c, d, a, x(10), S34, 0xbebfbc70); /* 40 */
-  HH (a, b, c, d, x(13), S31, 0x289b7ec6); /* 41 */
-  HH (d, a, b, c, x( 0), S32, 0xeaa127fa); /* 42 */
-  HH (c, d, a, b, x( 3), S33, 0xd4ef3085); /* 43 */
-  HH (b, c, d, a, x( 6), S34,  0x4881d05); /* 44 */
-  HH (a, b, c, d, x( 9), S31, 0xd9d4d039); /* 45 */
-  HH (d, a, b, c, x(12), S32, 0xe6db99e5); /* 46 */
-  HH (c, d, a, b, x(15), S33, 0x1fa27cf8); /* 47 */
-  HH (b, c, d, a, x( 2), S34, 0xc4ac5665); /* 48 */
-  
-  /* Round 4 */
-  II (a, b, c, d, x( 0), S41, 0xf4292244); /* 49 */
-  II (d, a, b, c, x( 7), S42, 0x432aff97); /* 50 */
-  II (c, d, a, b, x(14), S43, 0xab9423a7); /* 51 */
-  II (b, c, d, a, x( 5), S44, 0xfc93a039); /* 52 */
-  II (a, b, c, d, x(12), S41, 0x655b59c3); /* 53 */
-  II (d, a, b, c, x( 3), S42, 0x8f0ccc92); /* 54 */
-  II (c, d, a, b, x(10), S43, 0xffeff47d); /* 55 */
-  II (b, c, d, a, x( 1), S44, 0x85845dd1); /* 56 */
-  II (a, b, c, d, x( 8), S41, 0x6fa87e4f); /* 57 */
-  II (d, a, b, c, x(15), S42, 0xfe2ce6e0); /* 58 */
-  II (c, d, a, b, x( 6), S43, 0xa3014314); /* 59 */
-  II (b, c, d, a, x(13), S44, 0x4e0811a1); /* 60 */
-  II (a, b, c, d, x( 4), S41, 0xf7537e82); /* 61 */
-  II (d, a, b, c, x(11), S42, 0xbd3af235); /* 62 */
-  II (c, d, a, b, x( 2), S43, 0x2ad7d2bb); /* 63 */
-  II (b, c, d, a, x( 9), S44, 0xeb86d391); /* 64 */
-  
-  __asm {
-    mov tmp1,DWORD PTR [buf]
-    add DWORD PTR [tmp1],a
-    add DWORD PTR [tmp1+4],b
-    add DWORD PTR [tmp1+8],c
-    add DWORD PTR [tmp1+12],d
-  }
+    register uint32 a, b, c, d;
+
+    a = buf[0];
+    b = buf[1];
+    c = buf[2];
+    d = buf[3];
+
+    MD5STEP(F1, a, b, c, d, in[0] + 0xd76aa478, 7);
+    MD5STEP(F1, d, a, b, c, in[1] + 0xe8c7b756, 12);
+    MD5STEP(F1, c, d, a, b, in[2] + 0x242070db, 17);
+    MD5STEP(F1, b, c, d, a, in[3] + 0xc1bdceee, 22);
+    MD5STEP(F1, a, b, c, d, in[4] + 0xf57c0faf, 7);
+    MD5STEP(F1, d, a, b, c, in[5] + 0x4787c62a, 12);
+    MD5STEP(F1, c, d, a, b, in[6] + 0xa8304613, 17);
+    MD5STEP(F1, b, c, d, a, in[7] + 0xfd469501, 22);
+    MD5STEP(F1, a, b, c, d, in[8] + 0x698098d8, 7);
+    MD5STEP(F1, d, a, b, c, in[9] + 0x8b44f7af, 12);
+    MD5STEP(F1, c, d, a, b, in[10] + 0xffff5bb1, 17);
+    MD5STEP(F1, b, c, d, a, in[11] + 0x895cd7be, 22);
+    MD5STEP(F1, a, b, c, d, in[12] + 0x6b901122, 7);
+    MD5STEP(F1, d, a, b, c, in[13] + 0xfd987193, 12);
+    MD5STEP(F1, c, d, a, b, in[14] + 0xa679438e, 17);
+    MD5STEP(F1, b, c, d, a, in[15] + 0x49b40821, 22);
+
+    MD5STEP(F2, a, b, c, d, in[1] + 0xf61e2562, 5);
+    MD5STEP(F2, d, a, b, c, in[6] + 0xc040b340, 9);
+    MD5STEP(F2, c, d, a, b, in[11] + 0x265e5a51, 14);
+    MD5STEP(F2, b, c, d, a, in[0] + 0xe9b6c7aa, 20);
+    MD5STEP(F2, a, b, c, d, in[5] + 0xd62f105d, 5);
+    MD5STEP(F2, d, a, b, c, in[10] + 0x02441453, 9);
+    MD5STEP(F2, c, d, a, b, in[15] + 0xd8a1e681, 14);
+    MD5STEP(F2, b, c, d, a, in[4] + 0xe7d3fbc8, 20);
+    MD5STEP(F2, a, b, c, d, in[9] + 0x21e1cde6, 5);
+    MD5STEP(F2, d, a, b, c, in[14] + 0xc33707d6, 9);
+    MD5STEP(F2, c, d, a, b, in[3] + 0xf4d50d87, 14);
+    MD5STEP(F2, b, c, d, a, in[8] + 0x455a14ed, 20);
+    MD5STEP(F2, a, b, c, d, in[13] + 0xa9e3e905, 5);
+    MD5STEP(F2, d, a, b, c, in[2] + 0xfcefa3f8, 9);
+    MD5STEP(F2, c, d, a, b, in[7] + 0x676f02d9, 14);
+    MD5STEP(F2, b, c, d, a, in[12] + 0x8d2a4c8a, 20);
+
+    MD5STEP(F3, a, b, c, d, in[5] + 0xfffa3942, 4);
+    MD5STEP(F3, d, a, b, c, in[8] + 0x8771f681, 11);
+    MD5STEP(F3, c, d, a, b, in[11] + 0x6d9d6122, 16);
+    MD5STEP(F3, b, c, d, a, in[14] + 0xfde5380c, 23);
+    MD5STEP(F3, a, b, c, d, in[1] + 0xa4beea44, 4);
+    MD5STEP(F3, d, a, b, c, in[4] + 0x4bdecfa9, 11);
+    MD5STEP(F3, c, d, a, b, in[7] + 0xf6bb4b60, 16);
+    MD5STEP(F3, b, c, d, a, in[10] + 0xbebfbc70, 23);
+    MD5STEP(F3, a, b, c, d, in[13] + 0x289b7ec6, 4);
+    MD5STEP(F3, d, a, b, c, in[0] + 0xeaa127fa, 11);
+    MD5STEP(F3, c, d, a, b, in[3] + 0xd4ef3085, 16);
+    MD5STEP(F3, b, c, d, a, in[6] + 0x04881d05, 23);
+    MD5STEP(F3, a, b, c, d, in[9] + 0xd9d4d039, 4);
+    MD5STEP(F3, d, a, b, c, in[12] + 0xe6db99e5, 11);
+    MD5STEP(F3, c, d, a, b, in[15] + 0x1fa27cf8, 16);
+    MD5STEP(F3, b, c, d, a, in[2] + 0xc4ac5665, 23);
+
+    MD5STEP(F4, a, b, c, d, in[0] + 0xf4292244, 6);
+    MD5STEP(F4, d, a, b, c, in[7] + 0x432aff97, 10);
+    MD5STEP(F4, c, d, a, b, in[14] + 0xab9423a7, 15);
+    MD5STEP(F4, b, c, d, a, in[5] + 0xfc93a039, 21);
+    MD5STEP(F4, a, b, c, d, in[12] + 0x655b59c3, 6);
+    MD5STEP(F4, d, a, b, c, in[3] + 0x8f0ccc92, 10);
+    MD5STEP(F4, c, d, a, b, in[10] + 0xffeff47d, 15);
+    MD5STEP(F4, b, c, d, a, in[1] + 0x85845dd1, 21);
+    MD5STEP(F4, a, b, c, d, in[8] + 0x6fa87e4f, 6);
+    MD5STEP(F4, d, a, b, c, in[15] + 0xfe2ce6e0, 10);
+    MD5STEP(F4, c, d, a, b, in[6] + 0xa3014314, 15);
+    MD5STEP(F4, b, c, d, a, in[13] + 0x4e0811a1, 21);
+    MD5STEP(F4, a, b, c, d, in[4] + 0xf7537e82, 6);
+    MD5STEP(F4, d, a, b, c, in[11] + 0xbd3af235, 10);
+    MD5STEP(F4, c, d, a, b, in[2] + 0x2ad7d2bb, 15);
+    MD5STEP(F4, b, c, d, a, in[9] + 0xeb86d391, 21);
+
+    buf[0] += a;
+    buf[1] += b;
+    buf[2] += c;
+    buf[3] += d;
 }
