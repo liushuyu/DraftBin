@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <windows.h>
 #include "md5sum.h"
 #define FILETOVERIFY "C:\\cygwin.7z"
 int main () {

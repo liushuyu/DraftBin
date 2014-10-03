@@ -20,10 +20,10 @@
 //# include "funcs.h"
 //# include "defs.h"
 #include <memory.h>		 /* for memcpy() */
-#include <windows.h>
 #define VERSION     "2.2 (2014-09-05)"
 //optimized again by LZX
 #include <stdio.h>
+#include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
 #ifdef _WIN32
