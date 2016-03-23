@@ -1,29 +1,31 @@
-From 14de8f33b8e4cbbbf880184f0c14292cfa94589b Mon Sep 17 00:00:00 2001
+From 648ee00c23ef7f230af8b26da8c821ee5037350e Mon Sep 17 00:00:00 2001
 From: liushuyu <liushuyu011@gmail.com>
 Date: Tue, 22 Mar 2016 21:15:50 +0800
-Subject: [PATCH] [CMake+MinGW] Add CMake and MinGW support
+Subject: [PATCH] Add CMake and MinGW support
 
 ---
- CQPdemo/CMakeLists.txt                   | 35 ++++++++++++++++++++++++++++++++
- CQPdemo/build.sh                         | 14 +++++++++++++
- CQPdemo/cqp.h                            |  7 +++----
+ CQPdemo/CMakeLists.txt                   | 43 ++++++++++++++++++++++++++++++++
+ CQPdemo/build.sh                         | 14 +++++++++++
+ CQPdemo/cqp.h                            |  7 +++---
  CQPdemo/targetver.h                      |  2 +-
- CQPdemo/toolchain-i686-w64-mingw32.cmake | 16 +++++++++++++++
- 5 files changed, 69 insertions(+), 5 deletions(-)
+ CQPdemo/toolchain-i686-w64-mingw32.cmake | 16 ++++++++++++
+ 5 files changed, 77 insertions(+), 5 deletions(-)
  create mode 100644 CQPdemo/CMakeLists.txt
  create mode 100644 CQPdemo/build.sh
  create mode 100644 CQPdemo/toolchain-i686-w64-mingw32.cmake
 
 diff --git a/CQPdemo/CMakeLists.txt b/CQPdemo/CMakeLists.txt
 new file mode 100644
-index 0000000..cfc9ce4
+index 0000000..3c7a5d0
 --- /dev/null
 +++ b/CQPdemo/CMakeLists.txt
-@@ -0,0 +1,35 @@
+@@ -0,0 +1,43 @@
 +cmake_minimum_required (VERSION 2.6)
-+project (CQPdemo CXX)
++project (CQPdemo)
 +SET(PROJECT_VERSION_MAJOR 9)
 +SET(PROJECT_VERSION_MINOR 2)
++INCLUDE(CheckIncludeFiles)
++CHECK_INCLUDE_FILES(windows.h HAVE_WINDOWS_H)
 +SET(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 +message("Experimental port: unstable!")
 +set(CQD_SRC
@@ -47,7 +49,12 @@ index 0000000..cfc9ce4
 +    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
 +endif()
 +IF(NOT WIN32)
++    message("${HAVE_WINDOWS_H}")
++    if (HAVE_WINDOWS_H)
 +    message("You will cross-compile on this device. BE CAREFUL!!")
++    ELSE(HAVE_WINDOWS_H)
++    message(FATAL_ERROR "Error: Failed to find mandatory header files!! Please note that this project only runs on Windows!!")
++    endif(HAVE_WINDOWS_H)
 +ENDIF() 
 +message("Current Source Dir: ${CMAKE_CURRENT_BINARY_DIR}")
 +add_custom_target(pre_lib COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_CURRENT_SOURCE_DIR}/CQP.lib" "${CMAKE_BINARY_DIR}/libCQP.a")
@@ -55,6 +62,7 @@ index 0000000..cfc9ce4
 +add_library(cqd SHARED "${CQD_SRC}")
 +link_libraries(cqd "CQP")
 +add_dependencies(cqd pre_lib)
++
 diff --git a/CQPdemo/build.sh b/CQPdemo/build.sh
 new file mode 100644
 index 0000000..82c92d1
@@ -110,7 +118,7 @@ index 87c0086..f6dc5bf 100644
 +#include <sdkddkver.h>
 diff --git a/CQPdemo/toolchain-i686-w64-mingw32.cmake b/CQPdemo/toolchain-i686-w64-mingw32.cmake
 new file mode 100644
-index 0000000..1788fd7
+index 0000000..3ee6ceb
 --- /dev/null
 +++ b/CQPdemo/toolchain-i686-w64-mingw32.cmake
 @@ -0,0 +1,16 @@
