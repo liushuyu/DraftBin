@@ -1,0 +1,85 @@
+From 15202812a547d8d55f6ce5b92c09669539477c9a Mon Sep 17 00:00:00 2001
+From: liushuyu <liushuyu011@gmail.com>
+Date: Wed, 11 May 2016 20:39:47 +0800
+Subject: [PATCH] Alternative fix for Window Decoration
+
+Alternative fix for Mac SubWindow bug
+---
+ include/SubWindow.h   |  3 +++
+ src/gui/SubWindow.cpp | 19 ++++++++++++++++---
+ 2 files changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/include/SubWindow.h b/include/SubWindow.h
+index a12278b..7bacb31 100644
+--- a/include/SubWindow.h
++++ b/include/SubWindow.h
+@@ -64,9 +64,12 @@ protected:
+ 	virtual void moveEvent( QMoveEvent * event );
+ 	virtual void resizeEvent( QResizeEvent * event );
+ 	virtual void paintEvent( QPaintEvent * pe );
++        bool toggleMaximized = 0;
+ 
+ private slots:
+ 	void maximize();
++        void minimize();
++        void restore();
+ private:
+ 	const QSize m_buttonSize;
+ 	const int m_titleBarHeight;
+diff --git a/src/gui/SubWindow.cpp b/src/gui/SubWindow.cpp
+index 4dc90dc..d2b969d 100644
+--- a/src/gui/SubWindow.cpp
++++ b/src/gui/SubWindow.cpp
+@@ -64,13 +64,13 @@ SubWindow::SubWindow( QWidget *parent, Qt::WindowFlags windowFlags ) :
+ 	m_minimizeBtn->resize( m_buttonSize );
+ 	m_minimizeBtn->setFocusPolicy( Qt::NoFocus );
+ 	m_minimizeBtn->setToolTip( tr( "Minimize" ) );
+-	connect( m_minimizeBtn, SIGNAL( clicked( bool ) ), this, SLOT( showMinimized() ) );
++	connect( m_minimizeBtn, SIGNAL( clicked( bool ) ), this, SLOT( minimize() ) );
+ 
+ 	m_restoreBtn = new QPushButton( embed::getIconPixmap( "restore" ), QString::null, this );
+ 	m_restoreBtn->resize( m_buttonSize );
+ 	m_restoreBtn->setFocusPolicy( Qt::NoFocus );
+ 	m_restoreBtn->setToolTip( tr( "Restore" ) );
+-	connect( m_restoreBtn, SIGNAL( clicked( bool ) ), this, SLOT( showNormal() ) );
++	connect( m_restoreBtn, SIGNAL( clicked( bool ) ), this, SLOT( restore() ) );
+ 
+ 	// QLabel for the window title and the shadow effect
+ 	m_shadow = new QGraphicsDropShadowEffect();
+@@ -110,11 +110,23 @@ void SubWindow::paintEvent( QPaintEvent * )
+ void SubWindow::maximize()
+ {
+ 		showMaximized();
++                toggleMaximized = 1;
+ 		m_maximizeBtn->hide();
+ 		m_restoreBtn->move( 38, 3 );
+ 		m_restoreBtn->show();
+ }
+ 
++void SubWindow::minimize()
++{
++		showMinimized();
++                toggleMaximized = 0;
++}
++
++void SubWindow::restore()
++{
++		showNormal();
++                toggleMaximized = 0;
++}
+ 
+ 
+ 
+@@ -204,7 +216,8 @@ void SubWindow::resizeEvent( QResizeEvent * event )
+ 	// button adjustments
+ 	m_minimizeBtn->hide();
+ 	m_maximizeBtn->hide();
+-	if( !( windowState().testFlag( Qt::WindowMaximized ) ) ) { m_restoreBtn->hide(); qDebug() <<  "triggered!" << windowState();}
++	//if( !( windowState().testFlag( Qt::WindowMaximized ) ) ) { m_restoreBtn->hide(); qDebug() <<  "triggered!" << windowState();}
++        if ( ! toggleMaximized ) { m_restoreBtn->hide(); qDebug() <<  "triggered!" << windowState();}
+ 
+ 
+ 	const int rightSpace = 3;
+-- 
+2.8.2
+
