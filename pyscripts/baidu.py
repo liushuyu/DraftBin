@@ -132,6 +132,7 @@ def baidu_download(url, output_dir = '.', stream_type = None, merge = True, info
                               output_dir=output_dir, merge=False)
 
 def baidu_pan_download(url):
+    errno_patt = r'errno":([^"]+),'
     refer_url = ""
     fake_headers = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -151,15 +152,18 @@ def baidu_pan_download(url):
     refer_url = "http://pan.baidu.com"
     html = get_content(url, fake_headers, decoded=True)
     isprotected = False
+    sign, _, _, _, _, _, _ = baidu_pan_parse(html)
     if sign == None:
-        if re.match(r'<body class="acss_verify_code">', html):
+        if re.findall(r'\bacss_verify_code\b', html):
             isprotected = True
-            raise NotImplementedError("Password required!")
-        raise AssertionError("Share not found or canceled: %s" % url)
+            sign, timestamp, bdstoken, appid, primary_id, fs_id, uk, fake_headers, psk = baidu_pan_protected_share(url)
+            # raise NotImplementedError("Password required!")
+        if isprotected != True:
+            raise AssertionError("Share not found or canceled: %s" % url)
     if bdstoken == None:
         bdstoken = ""
-    title = r1(r'server_filename":"([^"]+)"', html)
-    sign, timestamp, bdstoken, appid = baidu_pan_parse(html)
+    if isprotected != True:
+        sign, timestamp, bdstoken, appid, primary_id, fs_id, uk = baidu_pan_parse(html)
     request_url = "http://pan.baidu.com/api/sharedownload?sign=%s&timestamp=%s&bdstoken=%s&channel=chunlei&clienttype=0&web=1&app_id=%s" % (sign, timestamp, bdstoken, appid)
     refer_url = url
     post_data = {
@@ -169,11 +173,14 @@ def baidu_pan_download(url):
     'primaryid': primary_id,
     'fid_list': '['+fs_id+']'
     }
+    if isprotected == True:
+        post_data['sekey'] = psk
     response_content = post_content(request_url, fake_headers, post_data, True)
     errno = match1(response_content, errno_patt)
     if errno != "0":
         raise AssertionError("Server refused to provide download link! (Errno:%s)" % errno)
     real_url = r1(r'dlink":"([^"]+)"', response_content).replace('\\/', '/')
+    title = r1(r'server_filename":"([^"]+)"', response_content)
     assert real_url
     type, ext, size = url_info(real_url, faker = True)
     title_wrapped = json.loads('{"wrapper":"%s"}'%title)
@@ -199,7 +206,7 @@ def baidu_pan_parse(html):
     fs_id = match1(html,fs_id_patt)
     uk = match1(html,uk_patt)
     primary_id = match1(html,primary_id_patt)
-    return sign, timestamp, bdstoken, appid
+    return sign, timestamp, bdstoken, appid, primary_id, fs_id, uk
 
 def baidu_pan_gen_cookies(url, post_data=None):
     from http import cookiejar
@@ -214,6 +221,7 @@ def baidu_pan_protected_share(url):
     print('This share is protected by password!')
     inpwd = input('Please provide unlock password: ')
     inpwd = inpwd.replace(' ','').replace('\t','')
+    print('Please wait...')
     post_pwd = {
     'pwd': inpwd,
     'vcode': None,
@@ -224,8 +232,10 @@ def baidu_pan_protected_share(url):
     cookiejar = cookiejar.CookieJar()
     opener = request.build_opener(request.HTTPCookieProcessor(cookiejar))
     resp = opener.open('http://pan.baidu.com')
+    resp = opener.open(url)
     init_url = resp.geturl()
-    verify_url = 'http://pan.baidu.com/share/verify?%s&t=%s&channel=chunlei&clienttype=0&web=1' % (init_url.split('?',1)[1], (int)time.time())
+    print(init_url)
+    verify_url = 'http://pan.baidu.com/share/verify?%s&t=%s&channel=chunlei&clienttype=0&web=1' % (init_url.split('?',1)[1], int(time.time()))
     refer_url = init_url
     fake_headers = {
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -239,14 +249,17 @@ def baidu_pan_protected_share(url):
     }
     opener.addheaders = dict2triplet(fake_headers)
     pwd_resp = opener.open(verify_url, bytes(parse.urlencode(post_pwd), 'utf-8'))
-    pwd_res = json.loads(pwd_resp.read())
+    pwd_resp_str = ungzip(pwd_resp.read()).decode('utf-8')
+    pwd_res = json.loads(pwd_resp_str)
     if pwd_res['errno'] != 0:
         raise AssertionError('Server returned an error: %s (Incorrect password?)' % pwd_res['errno'])
     pg_resp = opener.open('http://pan.baidu.com/share/link?%s' % init_url.split('?',1)[1])
-    content = pg_resp.read()
-    sign, timestamp, bdstoken, appid = baidu_pan_parse(content)
+    content = ungzip(pg_resp.read()).decode('utf-8')
+    sign, timestamp, bdstoken, appid, primary_id, fs_id, uk = baidu_pan_parse(content)
     psk = query_cookiejar(cookiejar, 'BDCLND')
     psk = parse.unquote(psk)
+    fake_headers['Cookie'] = cookjar2hdr(cookiejar)
+    return sign, timestamp, bdstoken, appid, primary_id, fs_id, uk, fake_headers, psk
     
     
 def cookjar2hdr(cookiejar):
