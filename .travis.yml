@@ -1,8 +1,13 @@
-language: c
-compiler:
-  - gcc
+language: python
+python:
+  - "3.5"
+  - "3.5-dev"
+  - "nightly"
+
 sudo: required
     
 script:
 sudo apt-get update -qq
 sudo pip install octohub
+python pyscripts/test-fr.py
+
