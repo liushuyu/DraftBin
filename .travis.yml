@@ -1,0 +1,8 @@
+language: c
+compiler:
+  - gcc
+sudo: required
+    
+script:
+sudo apt-get update -qq
+sudo pip install octohub
