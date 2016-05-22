@@ -4,7 +4,5 @@ python:
    - "3.5-dev"
    - "nightly"
 
-sudo: required
-
 script:
    - python pyscripts/test-fr.py
