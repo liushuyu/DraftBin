@@ -5,9 +5,7 @@ python:
   - "nightly"
 
 sudo: required
-    
 script:
 sudo apt-get update -qq
 sudo pip install octohub
 python pyscripts/test-fr.py
-
