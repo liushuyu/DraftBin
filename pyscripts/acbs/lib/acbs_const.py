@@ -1,0 +1,5 @@
+'''
+Some helper constants
+'''
+
+
