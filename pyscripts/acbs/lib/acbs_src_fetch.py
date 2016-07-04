@@ -6,11 +6,19 @@ dump_loc = '/var/cache/acbs/tarballs/'
 def src_dispatcher(pkg_info):
     if pkg_info['DUMMYSRC'] != '':
         print('[I] Not fetching dummy source as required.')
-        return
+        return True
     if pkg_info['SRCTBL'] != '':
         src_url = pkg_info['SRCTBL']
         return src_url_dispatcher(src_url,pkg_info)
-    return
+    if pkg_info['GITSRC'] != '':
+        return src_git_fetch(pkg_info['GITSRC'],pkg_info)
+    if pkg_info['SVNSRC'] != '':
+        return src_svn_fetch(pkg_info['SVNSRC'],pkg_info)
+    if pkg_info['HGSRC'] != '':
+        return src_hg_fetch(pkg_info['HGSRC'],pkg_info)
+    if pkg_info['BZRSRC'] != '':
+        return src_bzr_fetch(pkg_info['BZRSRC'],pkg_info)
+    return True
     
 def src_url_dispatcher(url,pkg_info):
     #url_array = url.split('\n') #for future usage
@@ -27,17 +35,38 @@ def src_url_dispatcher(url,pkg_info):
         print('[W] In spec file: This source seems like a Git repository, while you misplaced it.')
         return src_git_fetch(url, pkg_info)
     elif proto == 'hg':
-        return src_hg_fetch(url, pkg_name)
+        return src_hg_fetch(url, pkg_info)
     elif proto == 'svn':
-        return src_svn_fetch(url, pkg_name)
+        return src_svn_fetch(url, pkg_info)
+    elif proto == 'bzr':
+        return src_bzr_fetch(url, pkg_info)
     else:
         print('[E] Unknown protocol {}'.format(proto))
         return False
     return True
 
 def src_git_fetch(url, pkg_info):
-    
-    return
+    if not test_progs(['git','-v']):
+        print('[E] Git is not installed!')
+        return False
+    if pkg_info['GITSRC'] == '':
+        print('[E] Source URL is empty!')
+        return False
+    if pkg_info['GITCO'] == '':
+        print('[W] Source revision not specified! Will use HEAD commit instead!')
+    print('[I] Cloning Git repository...')
+    try:
+        if os.path.isdir(pkg_info['NAME']) and os.path.isdir(pkg_info['NAME']+'/.git'):
+            subprocess.check_call(['git','pull','-f'])
+        subprocess.check_call(['git','clone',pkg_info['GITSRC'],pkg_info['NAME']])
+        if pkg_info['GITBRCH'] != '':
+            subprocess.check_call(['git','checkout','-f',pkg_info['GITBRCH']])
+        if pkg_info['GITCO'] != '':
+            subprocess.check_call(['git','reset','--hard',pkg_info['GITCO']])
+    except:
+        print('[E] Failed to fetch source!')
+        return False
+    return True
 
 def src_tbl_fetch(url,pkg_slug):
     use_progs = test_downloaders()
@@ -72,21 +101,30 @@ def src_tbl_fetch(url,pkg_slug):
             raise ValueError('...')
     return
 
-def src_svn_fetch(url):
-    
-    return
+def src_svn_fetch(url,pkg_info):
+    if not test_progs(['svn','-h']):
+        print('[E] Subverion is not installed!')
+        return False
+    if pkg_info['SVNSRC'] == '':
+        print('[E] Source URL is empty!')
+        return False
+    if pkg_info['SVNCO'] == '':
+        print('[W] Source revision not specified! Will use latest revision instead!')
+        pkg_info['SVNCO'] = 'HEAD'
+    subprocess.check_call(['svn','co','-r',pkg_info['SVNCO']])
+    return True
 
 def src_hg_fetch(url):
-    
-    return
+    pass
+    return True
 
 def src_bzr_fetch(url):
     
-    return
+    return True
 
 def src_bk_fetch(url):
     
-    return
+    return True
 
 
 
@@ -95,13 +133,13 @@ External downloaders
 '''
 def test_downloaders():
     use_progs = []
-    if test_progs(['aria2c','-h','>','/dev/null']):
+    if test_progs(['aria2c','-h']):
         use_progs.append('aria')
-    if test_progs(['axel','-h','>','/dev/null']):
+    if test_progs(['axel','-h']):
         use_progs.append('axel')
-    if test_progs(['wget','-h','>','/dev/null']):
+    if test_progs(['wget','-h']):
         use_progs.append('wget')
-    if test_progs(['curl','-h','>','/dev/null']):
+    if test_progs(['curl','-h']):
         use_progs.append('curl')
     return use_progs
 
