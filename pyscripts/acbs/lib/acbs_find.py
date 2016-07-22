@@ -25,7 +25,7 @@ def acbs_pkg_match(target):
     return None
 
 def acbs_verify_pkg(path):
-    if os.path.exists(os.path.join(path,'spec')) and os.path.exists(os.path.join(path,'autobuild/defines')):
+    if os.path.exists(os.path.join(path,'spec')): #and os.path.exists(os.path.join(path,'autobuild/defines')):
         return True
     else:
         print('[E] Candidate package\033[93m {} \033[0mdoesn\'t seem to be valid!'.format(path))
