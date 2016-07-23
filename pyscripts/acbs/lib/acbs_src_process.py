@@ -11,7 +11,7 @@ def src_proc_dispatcher(pkg_name, src_tbl_name, src_loc):
     tobj = tempfile.TemporaryDirectory(dir='/var/cache/acbs/', prefix='acbs.')
     shadow_ark_loc = os.path.join(tobj.name, src_tbl_name)
     os.symlink(src_loc, shadow_ark_loc)
-    return decomp_file(shadow_ark_loc, tobj.name)
+    return decomp_file(shadow_ark_loc, tobj.name), tobj.name
 
 
 def file_type(file_loc):
@@ -43,7 +43,8 @@ def decomp_file(file_loc, dest):
         # x-tar*|zip*|x-*zip*|x-cpio*|x-gzip*|x-bzip*|x-xz*
         pass
     else:
-        print('[W] ACBS don\'t know how to decompress {} file, will give `bsdtar` a try!'.format(file_type_full(file_loc)))
+        print('[W] ACBS don\'t know how to decompress {} file, will leave it as is!'.format(file_type_full(file_loc)))
+        return True
     return decomp_lib(file_loc, dest)
 
 

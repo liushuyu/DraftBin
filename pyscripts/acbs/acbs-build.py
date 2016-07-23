@@ -8,11 +8,13 @@ import os
 import sys
 import subprocess
 import argparse
+# import time
 
 from lib.acbs_find import *
 from lib.acbs_parser import *
 from lib.acbs_deps import *
 from lib.acbs_utils import *
+from lib.acbs_start_build import *
 
 acbs_version = '0.0.1-alpha0'
 verbose = 0
@@ -64,10 +66,11 @@ def build_ind_pkg(pkg):
     else:
         return build_sub_pkgs(pkg, pkg_type_res)
     try:
-        pkg_slug = pkg.split('/')[1]
+        pkg_slug = os.path.basename(pkg)
     except:
         pkg_slug = pkg
     abbs_spec = parse_abbs_spec(pkg, pkg_slug)
+    repo_dir = os.path.abspath(pkg)
     if abbs_spec is False:
         err_msg()
         return -1
@@ -90,9 +93,13 @@ def build_ind_pkg(pkg):
             except:
                 err_msg('Sub-build process using thread {}, building \033[36m{}\033[0m \033[93mfailed!\033[0m'.format(sub_thread.name,sub_pkg))
                 return 128
-    if src_dispatcher(abbs_spec) is False:
-        err_msg('Failed to fetch source files!')
-    pass
+    src_proc_result, tmp_dir_loc = src_dispatcher(abbs_spec)
+    if src_proc_result is False:
+        err_msg('Failed to fetch and process source files!')
+    if not start_ab3(tmp_dir_loc, repo_dir, abbs_spec):
+        err_msg('Autobuild process failure!')
+        return 1
+    
     return 0
 
 
@@ -106,6 +113,7 @@ def build_sub_pkgs(pkg_base, pkgs_array):
     pkg_names = []
     for i in pkgs_array:
         pkg_names.append(pkgs_array[i])
+        repo_dir = os.path.abspath(pkg_base + '/' + i + '-' + pkg_names)
     print('[I] Package group detected: contains: \033[36m{}\033[0m'.format(arr2str(pkg_names)))
     pass
 

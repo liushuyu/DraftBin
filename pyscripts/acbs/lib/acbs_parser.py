@@ -17,13 +17,13 @@ def parse_abbs_spec(spec_file_loc, pkg_name):
         print('[E] Failed to load spec file! Do you have read permission?')
         return False
     # Stupid but necessary laundry list of possible varibles
-    script = spec_cont + gen_laundry_list(['VER','REL','SUBDIR','SRCTBL','GITSRC','GITCO','GITBRCH','SVNSRC','SVNCO','HGSRC','BZRSRC','BZRCO','DUMMYSRC'])
+    script = spec_cont + gen_laundry_list(['VER', 'REL', 'SUBDIR', 'SRCTBL', 'GITSRC', 'GITCO', 'GITBRCH', 'SVNSRC', 'SVNCO', 'HGSRC', 'BZRSRC', 'BZRCO', 'DUMMYSRC'])
     try:
         spec_out = subprocess.check_output(script, shell=True)  # Better to be replaced by subprocess.Popen
     except:
         print('[E] Malformed spec file found! Couldn\'t continue!')
         return False
-    spec_fp = io.StringIO('[wrap]\n' + spec_out.decode('utf-8'))  #Assume it's UTF-8 since we have no clue of the real world on how it works ...
+    spec_fp = io.StringIO('[wrap]\n' + spec_out.decode('utf-8'))  # Assume it's UTF-8 since we have no clue of the real world on how it works ...
     config = RawConfigParser()
     config.read_file(spec_fp)
     config_dict = {}
