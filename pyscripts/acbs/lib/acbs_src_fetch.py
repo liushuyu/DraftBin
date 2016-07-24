@@ -34,7 +34,7 @@ def src_url_dispatcher(url, pkg_info):
     except:
         print('[E] Illegal source URL!!!')
         return False
-    if proto == 'http' or proto == 'https':
+    if proto == 'http' or proto == 'https' or proto == 'ftp' or proto == 'ftps' or proto == 'ftpes':
         src_tbl_name = pkg_name + '-' + pkg_ver
         src_name = os.path.basename(url)
         if src_tbl_fetch(url, src_tbl_name):
@@ -42,13 +42,17 @@ def src_url_dispatcher(url, pkg_info):
     elif proto == 'git':  # or proto == 'git+https'
         print('[W] In spec file: This source seems like a Git repository, while\
          you misplaced it.')
-        return src_git_fetch(url, pkg_info)
+        if src_git_fetch(url, pkg_info):
+            return src_proc_dispatcher(pkg_name, pkg_name, dump_loc)
     elif proto == 'hg':
-        return src_hg_fetch(url, pkg_info)
+        if src_hg_fetch(url, pkg_info):
+            return src_proc_dispatcher(pkg_name, pkg_name, dump_loc)
     elif proto == 'svn':
-        return src_svn_fetch(url, pkg_info)
+        if src_svn_fetch(url, pkg_info):
+            return src_proc_dispatcher(pkg_name, pkg_name, dump_loc)
     elif proto == 'bzr':
-        return src_bzr_fetch(url, pkg_info)
+        if src_bzr_fetch(url, pkg_info):
+            return src_proc_dispatcher(pkg_name, pkg_name, dump_loc)
     else:
         print('[E] Unknown protocol {}'.format(proto))
         return False
@@ -56,7 +60,7 @@ def src_url_dispatcher(url, pkg_info):
 
 
 def src_git_fetch(url, pkg_info):
-    if not test_progs(['git', '-v']):
+    if not test_progs(['git', '--version']):
         print('[E] Git is not installed!')
         return False
     if pkg_info['GITSRC'] == '':
@@ -65,10 +69,12 @@ def src_git_fetch(url, pkg_info):
     if pkg_info['GITCO'] == '':
         print('[W] Source revision not specified! Will use HEAD commit instead!')
     print('[I] Cloning Git repository...')
+    os.chdir(dump_loc)
     try:
         if os.path.isdir(pkg_info['NAME']) and os.path.isdir(pkg_info['NAME']+'/.git'):
             subprocess.check_call(['git', 'pull', '-f'])
         subprocess.check_call(['git', 'clone', pkg_info['GITSRC'], pkg_info['NAME']])
+        os.chdir(pkg_info['NAME'])
         if pkg_info['GITBRCH'] != '':
             subprocess.check_call(['git', 'checkout', '-f', pkg_info['GITBRCH']])
         if pkg_info['GITCO'] != '':

@@ -52,7 +52,10 @@ def build_pkgs(pkgs):
             # print('[E] No valid candidate package found for {}'.format(pkg))
             return -1
         else:
-            return build_ind_pkg(matched_pkg)
+            if build_ind_pkg(matched_pkg) == 0:
+                continue
+            else:
+                return -1
     return 0
 
 
@@ -93,13 +96,18 @@ def build_ind_pkg(pkg):
             except:
                 err_msg('Sub-build process using thread {}, building \033[36m{}\033[0m \033[93mfailed!\033[0m'.format(sub_thread.name,sub_pkg))
                 return 128
-    src_proc_result, tmp_dir_loc = src_dispatcher(abbs_spec)
+    src_dispatcher_return = src_dispatcher(abbs_spec)
+    if isinstance(src_dispatcher_return, tuple):
+        src_proc_result, tmp_dir_loc = src_dispatcher_return
+    else:
+        src_proc_result = src_dispatcher_return
     if src_proc_result is False:
         err_msg('Failed to fetch and process source files!')
+        return 1
     if not start_ab3(tmp_dir_loc, repo_dir, abbs_spec):
         err_msg('Autobuild process failure!')
         return 1
-    
+
     return 0
 
 
@@ -113,7 +121,7 @@ def build_sub_pkgs(pkg_base, pkgs_array):
     pkg_names = []
     for i in pkgs_array:
         pkg_names.append(pkgs_array[i])
-        repo_dir = os.path.abspath(pkg_base + '/' + i + '-' + pkg_names)
+        repo_dir = os.path.abspath(pkg_base + '/' + str(i) + '-' + pkg_names)
     print('[I] Package group detected: contains: \033[36m{}\033[0m'.format(arr2str(pkg_names)))
     pass
 

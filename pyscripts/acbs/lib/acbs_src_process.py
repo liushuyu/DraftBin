@@ -3,6 +3,7 @@ import os
 import subprocess
 import re
 import tempfile
+import shutil
 from lib.acbs_utils import test_progs, group_match
 
 
@@ -10,9 +11,19 @@ def src_proc_dispatcher(pkg_name, src_tbl_name, src_loc):
     tobj = tempfile.mkdtemp(dir='/var/cache/acbs/build/', prefix='acbs.')
     src_tbl_loc = os.path.join(src_loc, src_tbl_name)
     shadow_ark_loc = os.path.join(tobj, src_tbl_name)
-    os.symlink(src_tbl_loc, shadow_ark_loc)
-    # print('[D] Source location: {}, Shadow link: {}'.format(src_tbl_loc, shadow_ark_loc))
-    return decomp_file(shadow_ark_loc, tobj), tobj
+    if os.path.isdir(src_tbl_loc):
+        print('[I] Making a copy of the source directory...', end='')
+        try:
+            shutil.copytree(src=src_tbl_loc, dst=shadow_ark_loc)
+        except:
+            print('Failed!')
+            return False
+        print('Done!')
+        return True, tobj
+    else:
+        os.symlink(src_tbl_loc, shadow_ark_loc)
+        # print('[D] Source location: {}, Shadow link: {}'.format(src_tbl_loc, shadow_ark_loc))
+        return decomp_file(shadow_ark_loc, tobj), tobj
 
 
 def file_type(file_loc):
