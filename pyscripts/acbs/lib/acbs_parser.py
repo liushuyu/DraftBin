@@ -39,8 +39,8 @@ def parse_abbs_spec(spec_file_loc, pkg_name):
 
 def parser_pass_through(config_dict, spec_file_loc):
     write_ab = {'VER': config_dict['VER'], 'REL': config_dict['REL']}
-    write_ab3_defines(spec_file_loc + '/autobuild/defines', write_ab)
-    return  # src_dispatcher(config_dict)
+    return write_ab3_defines(spec_file_loc + '/autobuild/defines', write_ab)
+    # return True# src_dispatcher(config_dict)
     # return True
 
 
@@ -75,6 +75,7 @@ def parser_validate(in_dict):
     return True, ''
 
 def write_ab3_defines(def_file_loc, in_dict):
+    print(def_file_loc)
     str_to_write = ''
     for i in in_dict:
         str_to_write = str_to_write + i + '=' + '\"' + in_dict[i] + '\"\n'

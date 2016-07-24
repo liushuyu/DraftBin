@@ -90,6 +90,9 @@ def group_match(pattern_list, string, logic_method):
             if not re.match(i, string):
                 return False
         return True
+    else:
+        raise ValueError('...')
+        return False
 
 
 def random_msg():

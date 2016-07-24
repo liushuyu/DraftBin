@@ -1,5 +1,5 @@
 import subprocess
-import ptyprocess
+# import ptyprocess
 import pty
 import time
 import os
@@ -23,7 +23,9 @@ def copy_abd(tmp_dir_loc, repo_dir, pkg_info):
             err_msg('Failed to determine sub-directory, please specify manually.')
             return False
     try:
-        shutil.copytree(os.path.join(repo_dir, 'autobuild/'), os.path.abspath(os.path.curdir), symlinks=True)
+        print(os.path.join(repo_dir, 'autobuild/'))
+        print(os.path.abspath(os.path.curdir))
+        shutil.copytree(os.path.join(repo_dir, 'autobuild/'), os.path.abspath(os.path.curdir) + '/autobuild/', symlinks=True)
     except:
         err_msg('Error occurred when copying files from tree!')
         return False
@@ -36,12 +38,14 @@ def start_ab3(tmp_dir_loc, repo_dir, pkg_info):
     if not copy_abd(tmp_dir_loc, repo_dir, pkg_info):
         return False
     # For logging support: ptyprocess.PtyProcessUnicode.spawn(['autobuild'])
-    parser_pass_through(pkg_info, tmp_dir_loc)
+    shadow_defines_loc = os.path.abspath(os.path.curdir)
+    if not parser_pass_through(pkg_info, shadow_defines_loc):
+        return False
     try:
         subprocess.check_call(['autobuild'])
     except:
         return False
     time_span = int(time.time()) - start_time
-    print('>>>>>>>>>>>>>>>>>> Time elapsed: {} seconds'.format(time_span))
+    print('>>>>>>>>>>>>>>>>>> Time elapsed:\033[36m {} \033[0mseconds'.format(time_span))
     # Will get better display later
     return True

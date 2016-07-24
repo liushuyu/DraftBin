@@ -36,8 +36,9 @@ def src_url_dispatcher(url, pkg_info):
         return False
     if proto == 'http' or proto == 'https':
         src_tbl_name = pkg_name + '-' + pkg_ver
+        src_name = os.path.basename(url)
         if src_tbl_fetch(url, src_tbl_name):
-            return src_proc_dispatcher(pkg_name, src_tbl_name, os.path.join(dump_loc + src_tbl_name))
+            return src_proc_dispatcher(pkg_name, src_name, dump_loc)
     elif proto == 'git':  # or proto == 'git+https'
         print('[W] In spec file: This source seems like a Git repository, while\
          you misplaced it.')
@@ -80,7 +81,7 @@ def src_git_fetch(url, pkg_info):
 
 def src_tbl_fetch(url, pkg_slug):
     use_progs = test_downloaders()
-    src_name = url.split('/')[-1]
+    src_name = os.path.basename(url)
     full_path = os.path.join(dump_loc, src_name)
     for i in use_progs:
         if i == 'aria':

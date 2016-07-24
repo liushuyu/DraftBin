@@ -134,7 +134,7 @@ class Magic(object):
         if isinstance(r, str):
             return r
         else:
-            return str(r).encode('utf-8')
+            return str(r, 'utf-8').encode('utf-8')
 
     def descriptor(self, fd):
         """
