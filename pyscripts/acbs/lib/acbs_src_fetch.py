@@ -2,7 +2,7 @@ import subprocess
 import os
 
 from lib.acbs_src_process import src_proc_dispatcher
-from lib.acbs_utils import test_progs
+from lib.acbs_utils import test_progs, err_msg
 
 dump_loc = '/var/cache/acbs/tarballs/'  # Currently hard-coded
 
@@ -56,7 +56,7 @@ def src_url_dispatcher(url, pkg_info):
     else:
         print('[E] Unknown protocol {}'.format(proto))
         return False
-    return True
+    return False
 
 
 def src_git_fetch(url, pkg_info):
@@ -72,9 +72,12 @@ def src_git_fetch(url, pkg_info):
     os.chdir(dump_loc)
     try:
         if os.path.isdir(pkg_info['NAME']) and os.path.isdir(pkg_info['NAME']+'/.git'):
-            subprocess.check_call(['git', 'pull', '-f'])
-        subprocess.check_call(['git', 'clone', pkg_info['GITSRC'], pkg_info['NAME']])
-        os.chdir(pkg_info['NAME'])
+            os.chdir(pkg_info['NAME'])
+            print('[I] Updating existing repository...')
+            # subprocess.check_call(['git', 'pull', '-f'])
+        else:
+            subprocess.check_call(['git', 'clone', pkg_info['GITSRC'], pkg_info['NAME']])
+            os.chdir(pkg_info['NAME'])
         if pkg_info['GITBRCH'] != '':
             subprocess.check_call(['git', 'checkout', '-f', pkg_info['GITBRCH']])
         if pkg_info['GITCO'] != '':
@@ -82,40 +85,33 @@ def src_git_fetch(url, pkg_info):
     except:
         print('[E] Failed to fetch source!')
         return False
-    return True
+    return src_proc_dispatcher(pkg_info['NAME'], pkg_info['NAME'], dump_loc)
 
 
 def src_tbl_fetch(url, pkg_slug):
     use_progs = test_downloaders()
     src_name = os.path.basename(url)
     full_path = os.path.join(dump_loc, src_name)
+    flag_file = full_path + '.dl'
+    if os.path.exists(full_path) and (not os.path.exists(flag_file)):
+        return True
+    fp = open(flag_file, 'wt')
+    fp.write('acbs flag: DO NOT DELETE!')
+    fp.close()
     for i in use_progs:
-        if i == 'aria':
-            try:
-                aria_get(url, output=full_path)
-                break
-            except:
-                continue
-        elif i == 'curl':
-            try:
-                curl_get(url, output=full_path)
-                break
-            except:
-                continue
-        elif i == 'wget':
-            try:
-                wget_get(url, output=full_path)
-                break
-            except:
-                continue
-        elif i == 'axel':
-            try:
-                axel_get(url, output=full_path)
-                break
-            except:
-                continue
-        else:
-            # raise ValueError('...')
+        try:
+            # print('{}_get({}, output={})'.format(i, url, full_path))
+            exec('{}_get(\'{}\', output=\'{}\')'.format(i, url, full_path))
+            os.unlink(flag_file)
+            break
+        except KeyboardInterrupt:
+            err_msg('You aborted the download!')
+            return False
+        except NameError:
+            raise NameError('An Internal Error occurred!')
+        except AssertionError:
+            continue
+        except:
             return False
     return True
 
@@ -174,6 +170,8 @@ def axel_get(url, threads=4, output=None):
         axel_cmd.insert(5, output)
     try:
         subprocess.check_call(axel_cmd)
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt()
     except:
         raise AssertionError('Failed to fetch source with Axel!')
     return
@@ -188,6 +186,8 @@ def curl_get(url, output=None):
         curl_cmd.insert(2, '-O')
     try:
         subprocess.check_call(curl_cmd)
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt()
     except:
         raise AssertionError('Failed to fetch source with cURL!')
     return
@@ -200,6 +200,8 @@ def wget_get(url, output):
         wget_cmd.insert(3, output)
     try:
         subprocess.check_call(wget_cmd)
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt()
     except:
         raise AssertionError('Failed to fetch source with Wget!')
     return
@@ -216,6 +218,8 @@ def aria_get(url, threads=3, output=None):
         aria_cmd.insert(5, output.split('/')[-1])
     try:
         subprocess.check_call(aria_cmd)
+    except KeyboardInterrupt:
+        raise KeyboardInterrupt()
     except:
         raise AssertionError('Failed to fetch source with Aria2!')
     return

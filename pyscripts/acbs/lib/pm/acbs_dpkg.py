@@ -25,7 +25,7 @@ def apt_query_pkgs(pkgs):
 
 def dpkg_req_dep_inst(pkgs):
     try:
-        apt_cmd = ['apt', 'install', '-qqy']
+        apt_cmd = ['apt', 'install', '-y']
         for i in pkgs:
             apt_cmd.append(i)
         subprocess.check_call(apt_cmd)

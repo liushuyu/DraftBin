@@ -61,12 +61,14 @@ def file_type_full(file_loc):
 
 def decomp_file(file_loc, dest):
     file_type_name = file_type(file_loc)
-    ext_list = ['x-tar*', 'zip*', 'x-zip*', 'x-cpio*', 'x-gzip*', 'x-bzip*', 'x-xz*']
+    ext_list = ['x-tar*', 'zip*', 'x-zip*',
+                'x-cpio*', 'x-gzip*', 'x-bzip*', 'x-xz*']
     if (len(file_type_name[0].split('application')) > 1) and group_match(ext_list, file_type_name[1], 1):
         # x-tar*|zip*|x-*zip*|x-cpio*|x-gzip*|x-bzip*|x-xz*
         pass
     else:
-        print('[W] ACBS don\'t know how to decompress {} file, will leave it as is!'.format(file_type_full(file_loc)))
+        print('[W] ACBS don\'t know how to decompress {} file, will leave it as is!'.format(
+            file_type_full(file_loc)))
         return True
     return decomp_lib(file_loc, dest)
 

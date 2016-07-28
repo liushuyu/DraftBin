@@ -20,17 +20,22 @@ def copy_abd(tmp_dir_loc, repo_dir, pkg_info):
         try:
             os.chdir(pkg_info['NAME'] + '-' + pkg_info['VER'])
         except:
-            err_msg('Failed to determine sub-directory, please specify manually.')
-            return False
+            try:
+                os.chdir(pkg_info['NAME'])
+            except:
+                err_msg(
+                    'Failed to determine sub-directory, please specify manually.')
+                return False
     try:
-        shutil.copytree(os.path.join(repo_dir, 'autobuild/'), os.path.abspath(os.path.curdir) + '/autobuild/', symlinks=True)
+        shutil.copytree(repo_dir,
+                        os.path.abspath(os.path.curdir) + '/autobuild/', symlinks=True)
     except:
         err_msg('Error occurred when copying files from tree!')
         return False
     return True
 
 
-def start_ab3(tmp_dir_loc, repo_dir, pkg_info):
+def start_ab3(tmp_dir_loc, repo_dir, pkg_info, rm_abdir=False):
     start_time = int(time.time())
     os.chdir(tmp_dir_loc)
     if not copy_abd(tmp_dir_loc, repo_dir, pkg_info):
@@ -44,6 +49,9 @@ def start_ab3(tmp_dir_loc, repo_dir, pkg_info):
     except:
         return False
     time_span = int(time.time()) - start_time
-    print('>>>>>>>>>>>>>>>>>> Time for building\033[36m {} \033[0m:\033[36m {} \033[0mseconds'.format(pkg_info['NAME'], time_span))
+    print('>>>>>>>>>>>>>>>>>> Time for building\033[36m {} \033[0m:\033[36m {} \033[0mseconds'.format(
+        pkg_info['NAME'], time_span))
+    if rm_abdir is True:
+        shutil.rmtree(os.path.abspath(os.path.curdir) + '/autobuild/')
     # Will get better display later
     return True

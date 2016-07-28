@@ -17,13 +17,17 @@ def parse_abbs_spec(spec_file_loc, pkg_name):
         print('[E] Failed to load spec file! Do you have read permission?')
         return False
     # Stupid but necessary laundry list of possible varibles
-    script = spec_cont + gen_laundry_list(['VER', 'REL', 'SUBDIR', 'SRCTBL', 'GITSRC', 'GITCO', 'GITBRCH', 'SVNSRC', 'SVNCO', 'HGSRC', 'BZRSRC', 'BZRCO', 'DUMMYSRC'])
+    script = spec_cont + gen_laundry_list(['VER', 'REL', 'SUBDIR', 'SRCTBL', 'GITSRC',
+                                           'GITCO', 'GITBRCH', 'SVNSRC', 'SVNCO', 'HGSRC', 'BZRSRC', 'BZRCO', 'DUMMYSRC'])
     try:
-        spec_out = subprocess.check_output(script, shell=True)  # Better to be replaced by subprocess.Popen
+        # Better to be replaced by subprocess.Popen
+        spec_out = subprocess.check_output(script, shell=True)
     except:
         print('[E] Malformed spec file found! Couldn\'t continue!')
         return False
-    spec_fp = io.StringIO('[wrap]\n' + spec_out.decode('utf-8'))  # Assume it's UTF-8 since we have no clue of the real world on how it works ...
+    # Assume it's UTF-8 since we have no clue of the real world on how it
+    # works ...
+    spec_fp = io.StringIO('[wrap]\n' + spec_out.decode('utf-8'))
     config = RawConfigParser()
     config.read_file(spec_fp)
     config_dict = {}
@@ -52,9 +56,11 @@ def parse_ab3_defines(defines_file):  # , pkg_name):
     except:
         print('[E] Failed to load autobuild defines file! Do you have read permission?')
         return False
-    script = "ARCH={}\n".format(get_arch_name()) + abd_cont + gen_laundry_list(['PKGDEP', 'BUILDDEP'])
+    script = "ARCH={}\n".format(
+        get_arch_name()) + abd_cont + gen_laundry_list(['PKGNAME', 'PKGDEP', 'BUILDDEP'])
     try:
-        abd_out = subprocess.check_output(script, shell=True)  # Better to be replaced by subprocess.Popen
+        # Better to be replaced by subprocess.Popen
+        abd_out = subprocess.check_output(script, shell=True)
     except:
         print('[E] Malformed Autobuild defines file found! Couldn\'t continue!')
         return False
@@ -66,13 +72,26 @@ def parse_ab3_defines(defines_file):  # , pkg_name):
         abd_config_dict[i.upper()] = abd_config['wrap'][i]
     return abd_config_dict
 
+
+def bat_parse_ab3_defines(defines_files):
+    onion_list = []
+    for def_file in defines_files:
+        abd_config_dict = parse_ab3_defines(def_file)
+        if abd_config_dict is False:
+            return False
+        else:
+            onion_list.append(abd_config_dict)
+    return onion_list
+
+
 def parser_validate(in_dict):
-    # just a simple validate for now
+    # just a simple naive validate for now
     if in_dict['NAME'] == '' or in_dict['VER'] == '':
         return False, 'Package name or version not valid!!!'
-    if check_empty(1, in_dict, ['SRCTBL','GITSRC','SVNSRC','HGSRC','BZRSRC']) == True:
+    if check_empty(1, in_dict, ['SRCTBL', 'GITSRC', 'SVNSRC', 'HGSRC', 'BZRSRC']) == True:
         return False, 'No source specified!'
     return True, ''
+
 
 def write_ab3_defines(def_file_loc, in_dict):
     str_to_write = ''
@@ -82,7 +101,8 @@ def write_ab3_defines(def_file_loc, in_dict):
         fp = open(def_file_loc, 'at')
         fp.write(str_to_write)
     except:
-        print('[E] Failed to update information in \033[36m{}\033[0m'.format(def_file_loc))
+        print('[E] Failed to update information in \033[36m{}\033[0m'.format(
+            def_file_loc))
         return False
     return True
 
@@ -101,3 +121,41 @@ def determine_pkg_type(pkg):
         return sub_dict
     else:
         return True
+
+
+def parse_acbs_conf(tree_name):
+    import configparser
+    acbs_config = RawConfigParser()
+    acbs_config._interpolation = configparser.ExtendedInterpolation()
+    fp = open('/etc/acbs_forest.conf', 'rt')
+    try:
+        acbs_config.read_file(fp)
+    except:
+        return None
+    try:
+        tree_loc_dict = acbs_config[tree_name]
+    except:
+        print('[E] 404 - Tree not found: {}, defined trees: {}'.format(tree_name,
+                                                                       arr2str(acbs_config.sections())))
+        return None
+    try:
+        tree_loc = tree_loc_dict['location']
+    except KeyError:
+        print('[E] Malformed configuration file: missing `location` keyword')
+        return None
+    return tree_loc
+
+
+def write_acbs_conf():
+    acbs_conf_writer = RawConfigParser()
+    acbs_conf_writer.add_section('default')
+    acbs_conf_writer.set('default', 'location', '/var/lib/abbs/repo/')
+    acbs_conf_writer.add_section('acbs')
+    acbs_conf_writer.set('acbs', 'location', '/var/lib/acbs/repo/')
+    try:
+        fp = open('/etc/acbs_forest.conf', 'w')
+        acbs_conf_writer.write(fp)
+    except:
+        err_msg('Unable to write initial configuration file!')
+        return False
+    return True

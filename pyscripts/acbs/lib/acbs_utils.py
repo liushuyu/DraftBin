@@ -16,9 +16,12 @@ def gen_laundry_list(items):
     return str_out
 
 
-def test_progs(cmd):
+def test_progs(cmd, display=False):
     try:
-        subprocess.check_output(cmd)
+        if display == False:
+            subprocess.check_output(cmd)
+        else:
+            subprocess.check_call(cmd)
     except:
         return False
 
@@ -72,7 +75,8 @@ def err_msg(desc=None):
     if desc is None:
         print('\n[E] Error occurred! Build terminated.')
     else:
-        print('\n[E] Error occurred:\033[93m {} \033[0mBuild terminated.'.format(desc))
+        print(
+            '\n[E] Error occurred:\033[93m {} \033[0mBuild terminated.'.format(desc))
     return
 
 
