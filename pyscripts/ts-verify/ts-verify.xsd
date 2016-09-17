@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+<xs:element name="byte">
+<xs:complexType>
+<xs:attribute name="value" type="xs:string" use="required"/>
+</xs:complexType>
+</xs:element>
+<xs:element name="extra-loc-feature">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="TS">
+<xs:complexType>
+<xs:sequence>
+<xs:element minOccurs="0" ref="defaultcodec"/>
+<xs:element maxOccurs="unbounded" minOccurs="0" ref="extra-loc-feature"/>
+<xs:element minOccurs="0" ref="dependencies"/>
+<xs:choice maxOccurs="unbounded">
+<xs:element ref="context"/>
+<xs:element ref="message"/>
+</xs:choice>
+</xs:sequence>
+<xs:attribute name="version" type="xs:string"/>
+<xs:attribute name="sourcelanguage" type="xs:string"/>
+<xs:attribute name="language" type="xs:string"/>
+</xs:complexType>
+</xs:element>
+<xs:element name="defaultcodec" type="xs:string"/>
+<xs:element name="context">
+<xs:complexType>
+<xs:sequence>
+<xs:element ref="name"/>
+<xs:element minOccurs="0" ref="comment"/>
+<xs:choice maxOccurs="unbounded">
+<xs:element ref="context"/>
+<xs:element ref="message"/>
+</xs:choice>
+</xs:sequence>
+<xs:attribute name="encoding" type="xs:string"/>
+</xs:complexType>
+</xs:element>
+<xs:element name="dependencies">
+<xs:complexType>
+<xs:sequence>
+<xs:element maxOccurs="unbounded" ref="dependencies"/>
+</xs:sequence>
+</xs:complexType>
+</xs:element>
+<xs:element name="name">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="comment">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="oldcomment">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="extracomment">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="translatorcomment">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="message">
+<xs:complexType>
+<xs:sequence>
+<xs:element maxOccurs="unbounded" minOccurs="0" ref="location"/>
+<xs:element minOccurs="0" ref="source"/>
+<xs:element minOccurs="0" ref="oldsource"/>
+<xs:element minOccurs="0" ref="comment"/>
+<xs:element minOccurs="0" ref="oldcomment"/>
+<xs:element minOccurs="0" ref="extracomment"/>
+<xs:element minOccurs="0" ref="translatorcomment"/>
+<xs:element minOccurs="0" ref="translation"/>
+<xs:element minOccurs="0" ref="userdata"/>
+<xs:element maxOccurs="unbounded" minOccurs="0" ref="extra-loc-feature"/>
+</xs:sequence>
+<xs:attribute name="id" type="xs:string"/>
+<xs:attribute default="false" name="utf8">
+<xs:simpleType>
+<xs:restriction base="xs:string">
+<xs:enumeration value="true"/>
+<xs:enumeration value="false"/>
+<xs:enumeration value="both"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:attribute>
+<xs:attribute default="no" name="numerus">
+<xs:simpleType>
+<xs:restriction base="xs:string">
+<xs:enumeration value="yes"/>
+<xs:enumeration value="no"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:attribute>
+</xs:complexType>
+</xs:element>
+<xs:element name="location">
+<xs:complexType>
+<xs:attribute name="filename" type="xs:string"/>
+<xs:attribute name="line" type="xs:string"/>
+</xs:complexType>
+</xs:element>
+<xs:element name="source">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="oldsource">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+<xs:element name="translation">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+<xs:element ref="numerusform"/>
+<xs:element ref="lengthvariant"/>
+</xs:choice>
+<xs:attribute name="type">
+<xs:simpleType>
+<xs:restriction base="xs:string">
+<xs:enumeration value="unfinished"/>
+<xs:enumeration value="vanished"/>
+<xs:enumeration value="obsolete"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:attribute>
+<xs:attribute default="no" name="variants">
+<xs:simpleType>
+<xs:restriction base="xs:string">
+<xs:enumeration value="yes"/>
+<xs:enumeration value="no"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:attribute>
+</xs:complexType>
+</xs:element>
+<xs:element name="userdata" type="xs:string"/>
+<xs:element name="numerusform">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+<xs:element ref="lengthvariant"/>
+</xs:choice>
+<xs:attribute default="no" name="variants">
+<xs:simpleType>
+<xs:restriction base="xs:string">
+<xs:enumeration value="yes"/>
+<xs:enumeration value="no"/>
+</xs:restriction>
+</xs:simpleType>
+</xs:attribute>
+</xs:complexType>
+</xs:element>
+<xs:element name="lengthvariant">
+<xs:complexType mixed="true">
+<xs:choice maxOccurs="unbounded" minOccurs="0">
+<xs:element ref="byte"/>
+</xs:choice>
+</xs:complexType>
+</xs:element>
+</xs:schema>
+
