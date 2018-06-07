@@ -1,0 +1,16 @@
+### Semi Automated OSXCross Tool-chain builder
+
+#### Requirements
+1. 50+ GB free disk space
+2. Decent network connection
+3. Decent powerful computer with recent Linux distribution installed
+4. Install `sed wget git cmake llvm clang clang++ bsdtar xz python2 python3 bash`
+5. Registered an Apple ID
+
+#### Instructions / Usage
+1. Make sure your Apple ID registered in Developer program, if not, go to https://developer.apple.com/download/ to register.
+2. [Recommended] Create a new directory and put all the files under this folder into that directory
+2. Run `pip3 install -r requirements.txt`, if your Linux distribution uses Python 3 as default Python interpreter, run `pip install -r requirements.txt`
+3. Run `XCODE_USERNAME=<your Apple ID> XCODE_PASSWORD=<your password> ./create_osxcross_toolchain.sh`
+4. Wait for ~2 hours and your tool chain will be built.
+5. Run the commands that you are told to run to install runtime libraries.

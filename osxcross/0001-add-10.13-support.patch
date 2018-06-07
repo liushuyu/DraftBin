@@ -1,0 +1,86 @@
+From ed21776203e41019eeda742c7e0e174e9b1a5e29 Mon Sep 17 00:00:00 2001
+From: liushuyu <liushuyu011@gmail.com>
+Date: Tue, 5 Jun 2018 21:51:29 -0600
+Subject: [PATCH] add 10.13 support
+
+---
+ build.sh                 |  3 ++-
+ tools/gen_sdk_package.sh | 17 ++++++++++++++---
+ tools/osxcross-macports  |  1 +
+ 3 files changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/build.sh b/build.sh
+index 5c0a82c..ac63748 100755
+--- a/build.sh
++++ b/build.sh
+@@ -73,7 +73,7 @@ verify_sdk_version $SDK_VERSION
+ # Minimum targeted OS X version
+ # Must be <= SDK_VERSION
+ if [ -z "$OSX_VERSION_MIN" ]; then
+-  if [ $SDK_VERSION = 10.4u ]; then
++  if [[ $SDK_VERSION == '10.4u' ]]; then
+     OSX_VERSION_MIN=10.4
+   else
+     OSX_VERSION_MIN=10.5
+@@ -93,6 +93,7 @@ case $SDK_VERSION in
+   10.9*) TARGET=darwin13; X86_64H_SUPPORTED=1; ;;
+   10.10*) TARGET=darwin14; X86_64H_SUPPORTED=1; ;;
+   10.11*) TARGET=darwin15; X86_64H_SUPPORTED=1; ;;
++  10.13*) TARGET=darwin17; X86_64H_SUPPORTED=1; ;;
+   *) echo "Invalid SDK Version" && exit 1 ;;
+ esac
+ 
+diff --git a/tools/gen_sdk_package.sh b/tools/gen_sdk_package.sh
+index 2f9d708..e6caeb9 100755
+--- a/tools/gen_sdk_package.sh
++++ b/tools/gen_sdk_package.sh
+@@ -122,13 +122,23 @@ for SDK in $SDKS; do
+   echo -n "packaging $(echo "$SDK" | sed -E "s/(.sdk|.pkg)//g") SDK "
+   echo "(this may take several minutes) ..."
+ 
+-  if [[ $SDK == *.pkg ]]; then
+-    cp $SDK $WDIR
++  if [ -h $SDK ]; then
++    SDK_DIR="$(readlink $SDK)"
++  else
++    SDK_DIR="$SDK"
++fi
++
++  if [[ $SDK_DIR == *.pkg ]]; then
++    cp $SDK_DIR $WDIR
+     continue
+   fi
+ 
+   TMP=$(mktemp -d /tmp/XXXXXXXXXXX)
+-  cp -r $SDK $TMP &>/dev/null || true
++  cp -r $SDK_DIR $TMP &>/dev/null || true
++
++  if [[ "$SDK" != "$SDK_DIR" ]]; then
++      mv "$TMP/$SDK_DIR" "$TMP/$SDK"
++  fi
+ 
+   pushd $XCODEDIR &>/dev/null
+ 
+@@ -148,6 +158,7 @@ for SDK in $SDKS; do
+ 
+   pushd $TMP &>/dev/null
+   $TAR -cf - * | $COMPRESSOR -9 -c - > "$WDIR/$SDK.$PKGEXT"
++  echo "SDK tarball ready at $WDIR/$SDK.$PKGEXT"
+   popd &>/dev/null
+ 
+   rm -rf $TMP
+diff --git a/tools/osxcross-macports b/tools/osxcross-macports
+index fc844b3..4d8943b 100755
+--- a/tools/osxcross-macports
++++ b/tools/osxcross-macports
+@@ -83,6 +83,7 @@ case $MACOSX_DEPLOYMENT_TARGET in
+   10.10* ) OSXVERSION="darwin_14" ;;
+   10.11* ) OSXVERSION="darwin_15" ;;
+   10.12* ) OSXVERSION="darwin_16" ;;
++  10.13* ) OSXVERSION="darwin_17" ;;
+        * ) unsupportedDepTarget ;;
+ esac
+ 
+-- 
+2.17.1
+
