@@ -10,22 +10,10 @@ function reconstruct_xcode_img() {
   # save disk space
   rm "$1"
 
-  python2 ../unscramble.py Content
-  echo 'Decompressing xz segments...'
-
-  for segment in *part*.xz; do
-    # remove empty files
-    if [[ "x$(du $segment | cut -f 1)" == 'x0' ]]; then
-      rm "$segment"
-    else
-      unxz "$segment"
-    fi
-  done
-  echo "Reconstrcting image file..."
-  cat *.cpio > "$2/Xcode_$XCODE_VER.cpio"
+  echo 'Reconstrcting image file...'
+  python2 ../unscramble.py Content "$2/Xcode_$XCODE_VER.cpio"
 
   echo "Cleaning up..."
-  rm -f *part*.cpio
   popd
   rm -rf "$TMP"
 }
@@ -81,8 +69,17 @@ popd
 
 echo 'Building LLVM dsymutil...'
 ./build_llvm_dsymutil.sh
+
+RT_BUILD_LOG="$(mktemp --suffix='.log' -p .)"
 echo 'Building LLVM compiler runtime...'
-./build_compiler_rt.sh
+./build_compiler_rt.sh | tee "${RT_BUILD_LOG}"
 
 echo "Done. Your toolchain is built at ${OC_SYSROOT}"
+
+set +e
+if which perl; then
+  perl -0777 -ne '/hand to install compiler-rt:\n(.*)/sg && print $1' < "${RT_BUILD_LOG}" > install_rt.sh
+  echo 'Please run install_rt.sh as root manually to install LLVM runtime. This operation may corrupt your LLVM installation.'
+  exit 0
+fi
 echo 'Please run the commands above as root to complete the installation'

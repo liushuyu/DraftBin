@@ -1,79 +1,133 @@
-# v2 pbzx stream handler
-# My personal writeup on the differences here: https://gist.github.com/pudquick/29fcfe09c326a9b96cf5
+#!/usr/bin/env python
+# Extract .cpio file from a pbzx Payload file.
 #
-# Pure python reimplementation of .cpio.xz content extraction from pbzx file payload originally here:
-# http://www.tonymacx86.com/general-help/135458-pbzx-stream-parser.html
+# Based on https://gist.github.com/pudquick/ac29c8c19432f2d200d4,
+# this version adds a command-line interface, improves efficiency (1 MiB chunks
+# instead of a full copy in memory), adds Python 3 compatibility and
+# automatically decompresses stuff (some blocks may not be compressed).
 #
-# Cleaned up C version (as the basis for my code) here, thanks to Pepijn Bruienne / @bruienne
-# https://gist.github.com/bruienne/029494bbcfb358098b41
+# Example usage (from Python):
+#
+#   parse_pbzx(open('PayloadJava', 'rb'), open('PayloadJava.cpio', wb'))
+#
+# Example usage (from shell):
+#
+#   # These are all equivalent
+#   ./parse_pbzx.py < PayloadJava > PayloadJava.cpio
+#   ./parse_pbzx.py PayloadJava > PayloadJava.cpio
+#   ./parse_pbzx.py PayloadJava PayloadJava.cpio
+#
+# Another example, extract Payload from a .pkg file, convert it to a cpio.xz
+# archive (this script) and list contents (cpio -t):
+#
+#   bsdtar -xOf some.pkg Payload | ./parse_pbzx.py Payload | cpio -t
+#
 
-import struct, sys
+from __future__ import print_function
 
-def seekread(f, offset=None, length=0, relative=True):
-    if (offset != None):
-        # offset provided, let's seek
-        f.seek(offset, [0,1,2][relative])
-    if (length != 0):
-        return f.read(length)
+import struct
+import os
+import sys
+from contextlib import contextmanager
+import subprocess
 
-def parse_pbzx(pbzx_path):
-    section = 0
-    xar_out_path = '%s.part%02d.cpio.xz' % (pbzx_path, section)
-    f = open(pbzx_path, 'rb')
-    # pbzx = f.read()
-    # f.close()
-    magic = seekread(f,length=4)
-    if magic != 'pbzx':
-        raise Exception("Not a pbzx file")
+
+def dbg_print(*args):
+    # Uncomment next line for debugging
+    # print(*args, file=sys.stderr)
+    pass
+
+
+def read_f(f, count):
+    """Try to fully read data, raising EOFError on short reads."""
+    data = f.read(count)
+    read_bytes = len(data)
+    if read_bytes != count:
+        raise EOFError("Read %d, expected %d" % (read_bytes, count))
+    return data
+
+
+def copy_data(f_in, f_out, count):
+    """Copy in chunks of a megabyte to avoid excess memory waste."""
+    while count > 0:
+        sz = min(count, 1024**2)
+        f_out.write(read_f(f_in, sz))
+        count -= sz
+
+
+@contextmanager
+def unxz(f_out):
+    proc = subprocess.Popen(["unxz"], stdin=subprocess.PIPE, stdout=f_out)
+    try:
+        yield proc.stdin
+    finally:
+        proc.stdin.close()
+        ret = proc.wait()
+        if ret != 0:
+            raise OSError("Decompression failed with status code %d" % ret)
+
+
+def parse_pbzx(pbzx_file, cpio_file, size=None):
+    magic = read_f(pbzx_file, 4)
+    if magic != b'pbzx':
+        raise RuntimeError("Error: Not a pbzx file")
     # Read 8 bytes for initial flags
-    flags = seekread(f,length=8)
+    flags = read_f(pbzx_file, 8)
     # Interpret the flags as a 64-bit big-endian unsigned int
     flags = struct.unpack('>Q', flags)[0]
-    xar_f = open(xar_out_path, 'wb')
+    out_offset, in_offset = 0, 4 + 8
     while (flags & (1 << 24)):
+        # update progress
+        if size:
+            sys.stderr.write('\r %s%% complete...' % (pbzx_file.tell() * 100 // size))
+            sys.stderr.flush()
         # Read in more flags
-        flags = seekread(f,length=8)
+        flags = read_f(pbzx_file, 8)
         flags = struct.unpack('>Q', flags)[0]
         # Read in length
-        f_length = seekread(f,length=8)
+        f_length = read_f(pbzx_file, 8)
         f_length = struct.unpack('>Q', f_length)[0]
-        xzmagic = seekread(f,length=6)
-        if xzmagic != '\xfd7zXZ\x00':
-            # This isn't xz content, this is actually _raw decompressed cpio_ chunk of 16MB in size...
-            # Let's back up ...
-            seekread(f,offset=-6,length=0)
-            # ... and split it out ...
-            f_content = seekread(f,length=f_length)
-            section += 1
-            decomp_out = '%s.part%02d.cpio' % (pbzx_path, section)
-            g = open(decomp_out, 'wb')
-            g.write(f_content)
-            g.close()
-            # Now to start the next section, which should hopefully be .xz (we'll just assume it is ...)
-            xar_f.close()
-            section += 1
-            new_out = '%s.part%02d.cpio.xz' % (pbzx_path, section)
-            xar_f = open(new_out, 'wb')
+
+        if f_length == 0x1000000:
+            # Literal copy
+            copy_data(pbzx_file, cpio_file, f_length)
         else:
-            f_length -= 6
-            # This part needs buffering
-            f_content = seekread(f,length=f_length)
-            tail = seekread(f,offset=-2,length=2)
-            xar_f.write(xzmagic)
-            xar_f.write(f_content)
-            if tail != 'YZ':
-                xar_f.close()
-                raise Exception("Error: Footer is not xar file footer")
+            xzmagic = read_f(pbzx_file, 6)
+            dbg_print("Flags: %#018x  Length: %r  Magic: %r" %
+                      (flags, f_length, xzmagic))
+            if xzmagic != b'\xfd7zXZ\x00':
+                cpio_file.close()
+                raise RuntimeError(
+                    "Error: Header is not xar file header: offset %d, magic %r" % (offset, xzmagic))
+            else:
+                with unxz(cpio_file) as unxz_f:
+                    unxz_f.write(xzmagic)
+                    # Do not copy header magic again (-6)
+                    copy_data(pbzx_file, unxz_f, -6 + f_length)
+
+        in_offset += (8 + 8 + f_length)
+        out_offset += f_length
+        dbg_print("Read %d bytes, wrote %d bytes so far" %
+                  (in_offset, out_offset))
     try:
-        f.close()
-        xar_f.close()
-    except:
+        cpio_file.close()
+    except Exception:
         pass
 
-def main():
-    result = parse_pbzx(sys.argv[1])
-    print("Now xz decompress the .xz chunks, then 'cat' them all together in order into a single new.cpio file")
- 
-if __name__ == '__main__':
-    main()
 
+if __name__ == '__main__':
+    def open_file(argno, mode, f):
+        size = None
+        if len(sys.argv) > argno:
+            if argno == 1:
+                size = os.path.getsize(sys.argv[argno])
+            return open(sys.argv[argno], mode), size
+        # Access binary stdin/stdout in Python 3
+        if hasattr(f, "buffer"):
+            return f.buffer, size
+        else:
+            return f, size
+    in_file, size = open_file(1, "rb", sys.stdin)
+    out_file, _ = open_file(2, "wb", sys.stdout)
+    parse_pbzx(in_file, out_file, size)
+    sys.stderr.write('\n')
