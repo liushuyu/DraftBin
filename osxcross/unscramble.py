@@ -130,4 +130,4 @@ if __name__ == '__main__':
     in_file, size = open_file(1, "rb", sys.stdin)
     out_file, _ = open_file(2, "wb", sys.stdout)
     parse_pbzx(in_file, out_file, size)
-    sys.stderr.write('\n')
+    sys.stderr.write('\r Done.        \n')

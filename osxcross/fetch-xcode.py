@@ -10,7 +10,8 @@ from html5lib.treebuilders import getTreeBuilder
 USER = ''
 PASS = ''
 XCODE_VER = '9.2'
-BLOB_URL = 'https://download.developer.apple.com/Developer_Tools/Xcode_%s/Xcode_%s.xip' % (XCODE_VER, XCODE_VER)
+MAC_VER='10.13'
+BLOB_URL = 'https://download.developer.apple.com/Developer_Tools/Command_Line_Tools_macOS_%s_for_Xcode_%s/Command_Line_Tools_macOS_%s_for_Xcode_%s.dmg' % (MAC_VER, XCODE_VER, MAC_VER, XCODE_VER)
 UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.62 Safari/537.36'
 
 

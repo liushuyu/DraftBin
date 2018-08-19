@@ -2,20 +2,8 @@
 
 # $1: file name
 function reconstruct_xcode_img() {
-  TMP="$(mktemp -d -p .)"
-
-  echo 'Extracting files...'
-  pushd "$TMP"
-  bsdtar -xf "$1"
-  # save disk space
-  rm "$1"
-
-  echo 'Reconstrcting image file...'
-  python2 ../unscramble.py Content "$2/Xcode_$XCODE_VER.cpio"
-
-  echo "Cleaning up..."
-  popd
-  rm -rf "$TMP"
+  source ./extract_image.sh
+  make_sdk_tbl "$1"
 }
 
 if [[ "x$XCODE_VER" == 'x' ]]; then
@@ -28,21 +16,15 @@ python3 fetch-xcode.py
 
 bash download_xcode$XCODE_VER.sh
 
-reconstruct_xcode_img "$(readlink -f Xcode_$XCODE_VER.xip)" "$(pwd)"
-
-echo 'Expanding archive...'
-cpio -i < Xcode_$XCODE_VER.cpio
-
-rm -f Xcode_$XCODE_VER.cpio
+echo 'Making SDK tarball...'
+reconstruct_xcode_img "$(readlink -f Command_Line_Tools_macOS_10.13_for_Xcode_${XCODE_VER}.dmg)"
 
 echo 'Cloning osxcross repository...'
 git clone --depth=50 https://github.com/tpoechtrager/osxcross/
 cd osxcross
 patch -Np1 -i ../0001-add-10.13-support.patch
 
-echo 'Making SDK tarball...'
-XCODEDIR="$(readlink -f ../Xcode.app)" ./tools/gen_sdk_package.sh
-mv MacOSX10.13.sdk.tar.* ./tarballs/
+mv ../MacOSX10.13.sdk.tar.* ./tarballs/
 
 set +e
 echo 'Build initial toolchain (will fail)'
