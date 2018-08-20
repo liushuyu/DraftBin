@@ -1,8 +1,13 @@
-language: python
-python:
-   - "3.5"
-   - "3.5-dev"
-   - "nightly"
-
+language: c
+sudo: required
+dist: trusty
+services:
+  - docker
 script:
-   - python pyscripts/test-fr.py
+  - docker run -v "$(pwd):/DraftBin" ubuntu:18.04 /bin/bash -ex /DraftBin/osxcross/travis-ci.sh
+env:
+  global:
+    secure: U97zUitUS4FulAQ4UtGRQj4exX7m1kG8z97KcadQi0zWNbB4wieCELlxhJAxasgEvSxcHraI9h7NumDeyYd0pdE1YnXD6RFLFs5p4t6nGE6IE1gcAqFF5Hatp2ut2/V8W2XmWogDhlWxwtOtyRF3dPGUUQoPa07efzs1B39FOCM=
+before_install:
+- openssl aes-256-cbc -K $encrypted_a8f0cafc61d6_key -iv $encrypted_a8f0cafc61d6_iv
+  -in osxcross/.cred.enc -out osxcross/.cred -d

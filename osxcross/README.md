@@ -4,11 +4,11 @@
 1. 5+ GB free disk space
 2. Decent network connection
 3. Decent powerful computer with recent Linux distribution installed
-4. Install `sed wget git cmake llvm clang clang++ bsdtar xz python2 python3 bash`
+4. Install `sed wget git cmake llvm clang clang++ bsdtar xz python2 python3 bash cmake`
 5. A valid Apple ID (for download macOS SDK)
 
 #### Instructions / Usage
-1. Make sure your Apple ID registered in Developer program, if not, go to https://developer.apple.com/download/ to register.
+1. Make sure your Apple ID has enrolled in Apple Developer program. If not, go to https://developer.apple.com/download/ to apply for the program.
 2. [Recommended] Create a new directory and put all the files under this folder into that directory
 3. Run `pip3 install -r requirements.txt`, if your Linux distribution uses Python 3 as default Python interpreter, run `pip install -r requirements.txt`
 4. Run `XCODE_USERNAME=<your Apple ID> XCODE_PASSWORD=<your password> ./create_osxcross_toolchain.sh`

@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -ex
 TARGET_MAC_VER='10.13'
 USEFUL_SUBPKG=('CLTools_Executables.pkg' "CLTools_SDK_macOS${TARGET_MAC_VER/./}.pkg")
 
@@ -30,7 +30,7 @@ export TMP="$(mktemp -d -p .)"
 pushd "$TMP"
 
 echo "Decompressing image..."
-7z x "$1" > /dev/null
+7z x "$1"
 find . -name "Command Line Tools*.pkg" -type f -exec cp {} ./target.pkg \;
 7z x ./target.pkg > /dev/null
 rm -f ./target.pkg
