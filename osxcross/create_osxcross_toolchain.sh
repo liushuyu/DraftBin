@@ -33,7 +33,11 @@ if UNATTENDED=1 ./build.sh; then
 fi
 set -e
 
-OC_SYSROOT="$(readlink -f ./target)"
+if [[ "x${OC_SYSROOT}" == 'x' ]]; then
+  OC_SYSROOT="$(readlink -f ./target)"
+fi
+
+echo "Toolchain will be installed to ${OC_SYSROOT}"
 
 echo 'Building TAPI library...'
 git clone https://github.com/tpoechtrager/apple-libtapi.git
