@@ -23,7 +23,7 @@
 #   bsdtar -xOf some.pkg Payload | ./parse_pbzx.py Payload | cpio -t
 #
 
-from __future__ import print_function
+
 
 import struct
 import os

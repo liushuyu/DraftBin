@@ -3,8 +3,8 @@ TARGET_MAC_VER='10.13'
 USEFUL_SUBPKG=('CLTools_Executables.pkg' "CLTools_SDK_macOS${TARGET_MAC_VER/./}.pkg")
 
 function make_sdk_tbl() {
-THISDIR="$(dirname $0)"
-THISDIR="$(readlink -f $THISDIR)"
+local THISDIR="$(dirname $0)"
+local THISDIR="$(readlink -f $THISDIR)"
 if ! which 7z 2>&1 > /dev/null; then
 	echo 'Please install p7zip!' && exit 1
 fi
@@ -22,6 +22,8 @@ fi
 unpack_archive "$1"
 collect_sdk_files "$TMP/dist/" "$THISDIR"
 rm -rf "$TMP"
+
+unset TMP
 }
 
 # $1: path to the image
@@ -45,7 +47,7 @@ do
 	tail -n 1 "${CPIO_FILE}" | wc -c | xargs -I {} truncate "${CPIO_FILE}" -s -{}
 	echo "Reconstructing image for package $pkg..."
 	# cpio archives could be "accumulated" given that end marker is removed
-	python2 ../unscramble.py "${pkg}/Payload" >> "${CPIO_FILE}"
+	python3 ../unscramble.py "${pkg}/Payload" >> "${CPIO_FILE}"
 done
 mkdir dist && cd dist
 echo 'Expanding archives...'
@@ -89,7 +91,7 @@ popd
 
 for i in $SDKS
 do
-	TMPDIR="$(mktemp -d)"
+	local TMPDIR="$(mktemp -d)"
 	echo "Preparing SDK files for ${i/.sdk/} target..."
 	cp -r "${SDK_LOCATION}/${i}/" "$TMPDIR"
 	if ! [ -z "${LIBCXX}" ]; then

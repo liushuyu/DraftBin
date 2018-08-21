@@ -23,8 +23,13 @@ echo 'Cloning osxcross repository...'
 git clone --depth=50 https://github.com/tpoechtrager/osxcross/
 cd osxcross
 patch -Np1 -i ../0001-add-10.13-support.patch
+patch -Np1 -i ../0002-make-prefix-changeable.patch
 
 mv ../MacOSX10.13.sdk.tar.* ./tarballs/
+
+if [[ "x${OC_SYSROOT}" == 'x' ]]; then
+  OC_SYSROOT="$(readlink -f ./target)"
+fi
 
 set +e
 echo 'Build initial toolchain (will fail)'
@@ -33,15 +38,12 @@ if UNATTENDED=1 ./build.sh; then
 fi
 set -e
 
-if [[ "x${OC_SYSROOT}" == 'x' ]]; then
-  OC_SYSROOT="$(readlink -f ./target)"
-fi
-
 echo "Toolchain will be installed to ${OC_SYSROOT}"
 
 echo 'Building TAPI library...'
 git clone https://github.com/tpoechtrager/apple-libtapi.git
 cd apple-libtapi
+git checkout -f 2.0.0
 INSTALLPREFIX="${OC_SYSROOT}" ./build.sh
 INSTALLPREFIX="${OC_SYSROOT}" ./install.sh
 cd ..

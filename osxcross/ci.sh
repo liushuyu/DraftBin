@@ -9,8 +9,9 @@ if [ -f .cred ]; then
 fi
 
 chmod a+x create_osxcross_toolchain.sh
-OC_SYSROOT='/opt/osxcross' ./create_osxcross_toolchain.sh
-bash ./install_rt.sh
+export OC_SYSROOT='/opt/osxcross'
+./create_osxcross_toolchain.sh
+bash ./osxcross/install_rt.sh
 
 # Tests
 printf '\n\n\n\n\n\nTesting the toolchain...'

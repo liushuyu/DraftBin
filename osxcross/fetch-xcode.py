@@ -10,14 +10,14 @@ from html5lib.treebuilders import getTreeBuilder
 USER = ''
 PASS = ''
 XCODE_VER = '9.2'
-MAC_VER='10.13'
-BLOB_URL = 'https://download.developer.apple.com/Developer_Tools/Command_Line_Tools_macOS_%s_for_Xcode_%s/Command_Line_Tools_macOS_%s_for_Xcode_%s.dmg' % (MAC_VER, XCODE_VER, MAC_VER, XCODE_VER)
+MAC_VER = '10.13'
+BLOB_URL = ''
 UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/67.0.3396.62 Safari/537.36'
 
 
 def generateDownload(cookies):
     logging.info('Generating download script...')
-    template = '#!/bin/bash\nwget -c --no-cookie --header \'User-Agent: %s\'\
+    template = '#!/bin/bash\nwget --show-progress -q -c --no-cookie --header \'User-Agent: %s\'\
                --header \'Cookie: %s\' \'%s\''
     cookie_string = ''
     found = False
@@ -84,6 +84,7 @@ if __name__ == '__main__':
     USER = os.environ.get('XCODE_USERNAME')
     PASS = os.environ.get('XCODE_PASSWORD')
     XCODE_VER = os.environ.get('XCODE_VER') or '9.2'
+    BLOB_URL = 'https://download.developer.apple.com/Developer_Tools/Command_Line_Tools_macOS_%s_for_Xcode_%s/Command_Line_Tools_macOS_%s_for_Xcode_%s.dmg' % (MAC_VER, XCODE_VER, MAC_VER, XCODE_VER)
     if (not USER) or (not PASS):
         print('\tPlease specify Apple ID and password using \n\
         XCODE_USERNAME and XCODE_PASSWORD environment varables. \n\
