@@ -22,7 +22,6 @@ reconstruct_xcode_img "$(readlink -f Command_Line_Tools_macOS_10.13_for_Xcode_${
 echo 'Cloning osxcross repository...'
 git clone --depth=50 https://github.com/tpoechtrager/osxcross/
 cd osxcross
-patch -Np1 -i ../0001-add-10.13-support.patch
 patch -Np1 -i ../0002-make-prefix-changeable.patch
 
 mv ../MacOSX10.13.sdk.tar.* ./tarballs/
