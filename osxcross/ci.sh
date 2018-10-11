@@ -1,4 +1,4 @@
-#!/bin/bash -ex
+#!/bin/bash -e
 
 cd -- "$(dirname $0)"
 pip3 install -r requirements.txt
@@ -10,6 +10,8 @@ fi
 
 chmod a+x create_osxcross_toolchain.sh
 export OC_SYSROOT='/opt/osxcross'
+export XCODE_VER='9.4.1'
+export SLIENT_RUNNING='1'
 ./create_osxcross_toolchain.sh
 bash ./osxcross/install_rt.sh
 

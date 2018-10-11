@@ -1,11 +1,15 @@
 #!/bin/bash -ex
-TARGET_MAC_VER='10.13'
+
+if [[ "x${TARGET_MAC_VER}" == 'x' ]]; then
+	export TARGET_MAC_VER='10.13'
+fi
+
 USEFUL_SUBPKG=('CLTools_Executables.pkg' "CLTools_SDK_macOS${TARGET_MAC_VER/./}.pkg")
 
 function make_sdk_tbl() {
 local THISDIR="$(dirname $0)"
 local THISDIR="$(readlink -f $THISDIR)"
-if ! which 7z 2>&1 > /dev/null; then
+if ! which 7z > /dev/null 2>&1; then
 	echo 'Please install p7zip!' && exit 1
 fi
 
@@ -113,4 +117,3 @@ do
 	rm -rf "TMPDIR"
 done
 }
-
