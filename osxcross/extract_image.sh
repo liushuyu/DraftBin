@@ -98,6 +98,7 @@ do
 	local TMPDIR="$(mktemp -d)"
 	echo "Preparing SDK files for ${i/.sdk/} target..."
 	cp -r "${SDK_LOCATION}/${i}/" "$TMPDIR"
+	mkdir -p "$TMPDIR/$i/usr/include/c++"
 	if ! [ -z "${LIBCXX}" ]; then
 		cp -r "${LIBCXX}/" "$TMPDIR/$i/usr/include/c++"
 	fi

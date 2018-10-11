@@ -69,6 +69,11 @@ popd
 echo 'Building LLVM dsymutil...'
 ./build_llvm_dsymutil.sh >> "${STDOUT}"
 
+if [[ "x${XCODE_NORT}" != 'x' ]]; then
+  echo "Skipped building compiler runtime."
+  exit
+fi
+
 RT_BUILD_LOG="$(mktemp --suffix='.log' -p .)"
 echo 'Building LLVM compiler runtime...'
 if [[ "${STDOUT}" == '/dev/stdout' ]]; then
