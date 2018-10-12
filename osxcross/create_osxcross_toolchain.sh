@@ -6,6 +6,16 @@ function reconstruct_xcode_img() {
   make_sdk_tbl "$1"
 }
 
+function guess_targets() {
+export OSX_VERSION_MIN='10.6';
+case $1 in
+  8*) TARGET=darwin17; GSTDCXX=1; ;;
+  9*) TARGET=darwin17; GSTDCXX=1; ;;
+  10*) TARGET=darwin18; GSTDCXX=0; export OSX_VERSION_MIN='10.9' ;;
+*) echo "Unknown target $1" && exit 1; ;;
+esac
+}
+
 if [[ "x$SLIENT_RUNNING" != 'x' ]]; then
   STDOUT="$(readlink -f osxcross_build.log)"
   echo "Running in less verbose mode. Detailed log: ${STDOUT}"
@@ -18,10 +28,13 @@ if [[ "x$XCODE_VER" == 'x' ]]; then
   echo "Xcode version not specified, using version $XCODE_VER"
 fi
 
-echo 'Downloading Xcode package...'
+guess_targets "${XCODE_VER}"
+
+echo 'Locating Xcode package...'
 python3 fetch-xcode.py
 
-bash download_xcode$XCODE_VER.sh >> "${STDOUT}"
+echo "Downloading Xcode image file..."
+bash download_xcode$XCODE_VER.sh >> "${STDOUT}" 2>&1
 
 echo 'Making SDK tarball...'
 reconstruct_xcode_img "$(readlink -f Command_Line_Tools_macOS_10.13_for_Xcode_${XCODE_VER}.dmg)"
@@ -33,6 +46,7 @@ fi
 
 git clone --depth=50 https://github.com/tpoechtrager/osxcross/
 cd osxcross
+patch -Np1 -i ../0001-sdk-10-14-support.patch
 patch -Np1 -i ../0002-make-prefix-changeable.patch
 
 mv ../MacOSX10.*.sdk.tar.* ./tarballs/
@@ -42,6 +56,7 @@ if [[ "x${OC_SYSROOT}" == 'x' ]]; then
 fi
 
 set +e
+export OSXCROSS_OSX_VERSION_MIN="${OSX_VERSION_MIN}"
 echo 'Build initial toolchain (will fail)'
 if UNATTENDED=1 ./build.sh >> "${STDOUT}"; then
   echo "That's strange... This should fail though..."
@@ -61,7 +76,7 @@ cd ..
 echo 'Building newer version of cctools...'
 git clone https://github.com/tpoechtrager/cctools-port.git
 pushd cctools-port/cctools/
-./configure --prefix="${OC_SYSROOT}" --target=x86_64-apple-darwin17 --with-libtapi="${OC_SYSROOT}" >> "${STDOUT}"
+./configure --prefix="${OC_SYSROOT}" --target="x86_64-apple-${TARGET}" --with-libtapi="${OC_SYSROOT}" >> "${STDOUT}"
 make -j$(nproc) >> "${STDOUT}"
 make install >> "${STDOUT}"
 popd
