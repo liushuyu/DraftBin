@@ -18,9 +18,11 @@ int mf_coinit() {
 		return -1;
 	}
 
+	// lite startup is faster and all what we need is included
 	hr = MFStartup(MF_VERSION, MFSTARTUP_LITE);
 	if (hr != S_OK)
 	{
+		// Do you know you can't initialize MF in test mode or safe mode?
 		std::cout << "Failed to initialize Media Foundation" << std::endl;
 		return -1;
 	}
@@ -67,18 +69,21 @@ void deinit(IMFTransform **transform) {
 	CoUninitialize();
 }
 
-IMFSample* create_sample(void *data, DWORD len, DWORD alignment = 16) {
+IMFSample* create_sample(void *data, DWORD len, DWORD alignment = 1, LONGLONG duration = 0) {
 	HRESULT hr = S_OK;
 	IMFMediaBuffer *buf = NULL;
 	IMFSample *sample = NULL;
 
 	hr = MFCreateSample(&sample);
 	if (FAILED(hr)) return NULL;
+	// Yes, the argument for alignment is the actual alignment - 1
 	hr = MFCreateAlignedMemoryBuffer(len, alignment - 1, &buf);
 	if (FAILED(hr)) return NULL;
 	if (data)
 	{
 		BYTE *buffer;
+		// lock the MediaBuffer
+		// this is actually not a thread-safe lock
 		hr = buf->Lock(&buffer, NULL, NULL);
 		if (FAILED(hr))
 		{
@@ -94,6 +99,7 @@ IMFSample* create_sample(void *data, DWORD len, DWORD alignment = 16) {
 	}
 
 	sample->AddBuffer(buf);
+	hr = sample->SetSampleDuration(duration);
 	SafeRelease(&buf);
 	return sample;
 }
@@ -103,6 +109,8 @@ int select_input_mediatype(IMFTransform *transform, int in_stream_id, GUID audio
 	GUID tmp;
 	IMFMediaType *t;
 
+	// actually you can get rid of the whole block of searching and filtering mess
+	// if you know the exact parameters of your media stream
 	for (DWORD i = 0; ; i++)
 	{
 		hr = transform->GetInputAvailableType(in_stream_id, i, &t);
@@ -120,8 +128,21 @@ int select_input_mediatype(IMFTransform *transform, int in_stream_id, GUID audio
 		if (!FAILED(hr))
 		{
 			if (IsEqualGUID(tmp, audio_format)) {
+				// see https://docs.microsoft.com/en-us/windows/desktop/medfound/aac-decoder#example-media-types
+				// and https://docs.microsoft.com/zh-cn/windows/desktop/api/mmreg/ns-mmreg-heaacwaveinfo_tag
+				// for the meaning of the byte array below
+
+				// for integrate into a larger project, it is recommended to wrap the parameters into a struct
+				// and pass that struct into the function
+				const UINT8 aac_data[] = { 0x01, 0x00, 0xfe, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x12, 0x10 };
 				// 0: raw aac 1: adts 2: adif 3: latm/laos
 				t->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 1);
+				t->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2);
+				t->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100);
+				// 0xfe = 254 = "unspecified"
+				t->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, 254);
+				t->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1);
+				t->SetBlob(MF_MT_USER_DATA, aac_data, 14);
 				hr = transform->SetInputType(in_stream_id, t, 0);
 				if (FAILED(hr))
 				{
@@ -142,6 +163,8 @@ int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID aud
 	UINT32 tmp;
 	IMFMediaType *t;
 
+	// If you know what you need and what you are doing, you can specify the condition instead of searching
+	// but it's better to use search since MFT may or may not support your output parameters
 	for (DWORD i = 0; ; i++)
 	{
 		hr = transform->GetOutputAvailableType(out_stream_id, i, &t);
@@ -181,12 +204,12 @@ int mf_flush(IMFTransform **transform) {
 	HRESULT hr = (*transform)->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, 0);
 	if (FAILED(hr))
 	{
-		std::cout << "flush command failed" << std::endl;
+		std::cout << "Flush command failed: " << hr << std::endl;
 	}
 	hr = (*transform)->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0);
 	if (FAILED(hr))
 	{
-		std::cout << "failed to end streaming for MFT" << std::endl;
+		std::cout << "Failed to end streaming for MFT" << hr << std::endl;
 	}
 
 	drain = false;
@@ -269,26 +292,27 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 			break;
 		}
 
-		if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT && drain) {
-			drain_complete = true;
-		}
-		else {
-			std::cout << "MFT: decoding failure: " << hr << std::endl;
+		if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT) {
+			// TODO: handle try again and EOF cases using drain value
+			ReportError(L"MFT: decoding failure", hr);
 			break;
 		}
 
 		break;
 	}
 
-	// TODO: handle try again and EOF cases
-	if (!out_sample && drain_complete)
+	if (out_sample != NULL)
 	{
 		return 0;
 	}
-	else
+
+	// TODO: handle try again and EOF cases using drain value
+	if (!out_sample)
 	{
-		return 1; // try again
+		ReportError(L"MFT: decoding failure", hr);
+		return 1;
 	}
+
 	return 0;
 }
 
@@ -307,13 +331,14 @@ int copy_sample_to_buffer(IMFSample* sample, void** output, DWORD* len) {
 	sample->ConvertToContiguousBuffer(&buffer);
 	if (FAILED(hr))
 	{
-		std::cout << "Failed to get sample buffer" << std::endl;
+		ReportError(L"Failed to get sample buffer", hr);
 		return -1;
 	}
 
 	hr = buffer->Lock(&data, NULL, NULL);
 	if (FAILED(hr))
 	{
+		ReportError(L"Failed to lock the buffer", hr);
 		SafeRelease(&buffer);
 		return -1;
 	}
@@ -332,6 +357,7 @@ int main(int argc, const char* argv[])
 
 	if (mf_coinit())
 	{
+		std::cout << "Error\n";
 		return 1;
 	}
 
@@ -341,7 +367,6 @@ int main(int argc, const char* argv[])
 	DWORD in_stream_id = 0;
 	DWORD out_stream_id = 0;
 	HRESULT hr = S_OK;
-	MFT_INPUT_STREAM_INFO in_info;
 	DWORD flags;
 
 	if (mf_decoder_init(&transform) != 0)
@@ -354,83 +379,44 @@ int main(int argc, const char* argv[])
 	hr = transform->GetStreamIDs(1, &in_stream_id, 1, &out_stream_id);
 	if (hr == E_NOTIMPL)
 	{
+		// if not implemented, it means this MFT does not assign stream ID for you
 		in_stream_id = 0;
 		out_stream_id = 0;
 	}
 	else if (FAILED(hr)) {
-		std::cout << "Decoder failed to initialize the stream ID" << std::endl;
+		ReportError(L"Decoder failed to initialize the stream ID", hr);
 		SafeRelease(&transform);
 		return 1;
 	}
 
-	hr = transform->GetInputStreamInfo(in_stream_id, &in_info);
-
-	// hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
-	// hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
-
 	if (argc < 2) {
-		std::cout << "Dry run complete." << std::endl;
-	}
-	else {
-		/* output_adts.aac (2018/12/14 20:52:15)
-   StartOffset(h): 00000000, EndOffset(h): 00000172, Length(h): 00000173 */
-
-		unsigned char buffer[371] = {
-			0xFF, 0xF1, 0x50, 0x80, 0x2E, 0x7F, 0xFC, 0x21, 0x00, 0x05, 0x00, 0xA0,
-			0x1B, 0xFF, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x37, 0xA3, 0x80, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7B
-		};
-
-
-		if (!buffer)
+		if (!sample_buffer)
 		{
 			std::cout << "? buffer" << std::endl;
 			goto end;
 		}
 
-			IMFSample *sample = NULL;
-			IMFSample *output = NULL;
-			int status = 0;
-			select_input_mediatype(transform, in_stream_id);
-			select_output_mediatype(transform, out_stream_id);
-				hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
-				sample = create_sample(buffer, 371);
-				std::cout << "-- Sample created" << std::endl;
-				status = send_sample(transform, in_stream_id, sample);
-				std::cout << "-- Processing input... " << status << std::endl;
-				transform->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0);
-				transform->ProcessMessage(MFT_MESSAGE_COMMAND_DRAIN, 0);
-				transform->GetOutputStatus(&flags);
-				std::cout << "-- MFT: " << ((flags & MFT_OUTPUT_STATUS_SAMPLE_READY) ? "Output Ready" : "Try again") << std::endl;
-				std::cout << "-- Generating output... " << ( receive_sample(transform, out_stream_id, &output) == 0 ? "OK" : "Error" ) << std::endl;
+		IMFSample *sample = NULL;
+		IMFSample *output = NULL;
+		int status = 0;
+		select_input_mediatype(transform, in_stream_id);
+		select_output_mediatype(transform, out_stream_id);
+
+		// optional messages, but can increase performance if you do this
+		// b/c MFT will fully initialize if you notify it
+		hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
+		hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
+
+		sample = create_sample((void*)sample_buffer, 1486, 1, 0);
+		std::cout << "-- Sample created" << std::endl;
+		status = send_sample(transform, in_stream_id, sample);
+		std::cout << "-- Processing input... " << (status == 0 ? "OK" : "Error") << std::endl;
+		transform->GetOutputStatus(&flags);
+		// the check below is very buggy for AAC MFT
+		std::cout << "-- MFT: " << ((flags & MFT_OUTPUT_STATUS_SAMPLE_READY) ? "Output Ready" : "Try again") << std::endl;
+		std::cout << "-- Generating output... " << (receive_sample(transform, out_stream_id, &output) == 0 ? "OK" : "Error") << std::endl;
+		std::cout << "Dry run complete." << std::endl;
+		goto end;
 	}
 
 end:
