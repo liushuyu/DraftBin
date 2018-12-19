@@ -163,11 +163,11 @@ int select_input_mediatype(IMFTransform *transform, int in_stream_id, GUID audio
 
 				// for integrate into a larger project, it is recommended to wrap the parameters into a struct
 				// and pass that struct into the function
-				const UINT8 aac_data[] = { 0x01, 0x00, 0xfe, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x12, 0x10 };
+				const UINT8 aac_data[] = { 0x01, 0x00, 0xfe, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x11, 0x90 };
 				// 0: raw aac 1: adts 2: adif 3: latm/laos
 				t->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 1);
 				t->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2);
-				t->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 44100);
+				t->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 48000);
 				// 0xfe = 254 = "unspecified"
 				t->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, 254);
 				t->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1);
@@ -204,7 +204,7 @@ int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID aud
 		if (FAILED(hr))
 		{
 			std::cout << "failed to get output types for MFT." << std::endl;
-			continue;
+			return -1;
 		}
 
 		hr = t->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &tmp);
@@ -285,6 +285,12 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 	DWORD status = 0;
 	bool mft_create_sample = false;
 
+	if (!out_sample)
+	{
+		ReportError(L"NULL pointer passed to receive_sample()", MF_E_SAMPLE_NOT_WRITABLE);
+		return -1;
+	}
+
 	hr = transform->GetOutputStreamInfo(out_stream_id, &out_info);
 
 	if (FAILED(hr))
@@ -322,24 +328,19 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 		}
 
 		if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT) {
-			// TODO: handle try again and EOF cases using drain value
-			ReportError(L"MFT: decoding failure", hr);
-			break;
+			// TODO: better handling try again and EOF cases using drain value
+			ReportError(L"MFT: decoder pending", hr);
+			return 1;
 		}
 
 		break;
 	}
 
-	if (out_sample != NULL)
-	{
-		return 0;
-	}
-
-	// TODO: handle try again and EOF cases using drain value
-	if (!out_sample)
+	// TODO: better handling try again and EOF cases using drain value
+	if (*out_sample == NULL)
 	{
 		ReportError(L"MFT: decoding failure", hr);
-		return 1;
+		return -1;
 	}
 
 	return 0;
@@ -375,6 +376,7 @@ int copy_sample_to_buffer(IMFSample* sample, void** output, DWORD* len) {
 	*output = malloc(*len);
 	memcpy(*output, data, *len);
 
+	// if buffer unlock fails, then... whatever, we have already got data
 	buffer->Unlock();
 	SafeRelease(&buffer);
 	return 0;

@@ -21,6 +21,8 @@ int main(int argc, const char* argv[])
 	IMFTransform *transform = NULL;
 	DWORD in_stream_id = 0;
 	DWORD out_stream_id = 0;
+	DWORD output_len = 0;
+	void *buffer = NULL;
 	HRESULT hr = S_OK;
 	DWORD flags;
 
@@ -62,7 +64,7 @@ int main(int argc, const char* argv[])
 		hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_BEGIN_STREAMING, 0);
 		hr = transform->ProcessMessage(MFT_MESSAGE_NOTIFY_START_OF_STREAM, 0);
 
-		sample = create_sample((void*)sample_buffer, 1486, 1, 0);
+		sample = create_sample((void*)sample_buffer, 300, 1, 0);
 		std::cout << "-- Sample created" << std::endl;
 		status = send_sample(transform, in_stream_id, sample);
 		std::cout << "-- Processing input... " << (status == 0 ? "OK" : "Error") << std::endl;
@@ -70,6 +72,12 @@ int main(int argc, const char* argv[])
 		// the check below is very buggy for AAC MFT
 		std::cout << "-- MFT: " << ((flags & MFT_OUTPUT_STATUS_SAMPLE_READY) ? "Output Ready" : "Try again") << std::endl;
 		std::cout << "-- Generating output... " << (receive_sample(transform, out_stream_id, &output) == 0 ? "OK" : "Error") << std::endl;
+		if (output)
+		{
+			std::cout << "-- Output received from MFT" << std::endl;
+			status = copy_sample_to_buffer(sample, &buffer, &output_len);
+			std::cout << "-- Output received from MFT: " << (status == 0 ? "OK" : "Error") << ", Length = " << output_len << std::endl;
+		}
 		std::cout << "Dry run complete." << std::endl;
 		goto end;
 	}
