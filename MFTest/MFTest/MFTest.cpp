@@ -55,9 +55,13 @@ int main(int argc, const char* argv[])
 
 		IMFSample *sample = NULL;
 		IMFSample *output = NULL;
+		ADTSData data;
+		char *tag = (char*)calloc(1, 14);
 		int status = 0;
-		select_input_mediatype(transform, in_stream_id);
+		detect_mediatype((char*)sample_buffer, 300, &data, &tag);
+		select_input_mediatype(transform, in_stream_id, data, (UINT8*)tag, 14);
 		select_output_mediatype(transform, out_stream_id);
+		free(tag);
 
 		// optional messages, but can increase performance if you do this
 		// b/c MFT will fully initialize if you notify it
@@ -67,6 +71,7 @@ int main(int argc, const char* argv[])
 		sample = create_sample((void*)sample_buffer, 300, 1, 0);
 		std::cout << "-- Sample created" << std::endl;
 		status = send_sample(transform, in_stream_id, sample);
+		status = send_sample(transform, in_stream_id, NULL);
 		std::cout << "-- Processing input... " << (status == 0 ? "OK" : "Error") << std::endl;
 		transform->GetOutputStatus(&flags);
 		// the check below is very buggy for AAC MFT

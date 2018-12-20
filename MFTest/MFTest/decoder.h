@@ -16,6 +16,8 @@
 #include <iostream>
 #include <string>
 
+#include "adts.h"
+
 template <class T> void SafeRelease(T **ppT);
 void ReportError(std::wstring msg, HRESULT hr);
 
@@ -24,7 +26,8 @@ int mf_coinit();
 int mf_decoder_init(IMFTransform **transform, GUID audio_format = MFAudioFormat_AAC);
 void mf_deinit(IMFTransform **transform);
 IMFSample* create_sample(void *data, DWORD len, DWORD alignment = 1, LONGLONG duration = 0);
-int select_input_mediatype(IMFTransform *transform, int in_stream_id, GUID audio_format = MFAudioFormat_AAC);
+int select_input_mediatype(IMFTransform *transform, int in_stream_id, ADTSData adts, UINT8 *user_data, UINT32 user_data_len, GUID audio_format = MFAudioFormat_AAC);
+int detect_mediatype(char* buffer, size_t len, ADTSData* output, char** aac_tag);
 int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID audio_format = MFAudioFormat_PCM);
 int mf_flush(IMFTransform **transform);
 int send_sample(IMFTransform *transform, DWORD in_stream_id, IMFSample* in_sample);

@@ -133,58 +133,47 @@ IMFSample* create_sample(void *data, DWORD len, DWORD alignment, LONGLONG durati
 	return sample;
 }
 
-int select_input_mediatype(IMFTransform *transform, int in_stream_id, GUID audio_format) {
+int select_input_mediatype(IMFTransform *transform, int in_stream_id, ADTSData adts,
+						UINT8 *user_data, UINT32 user_data_len, GUID audio_format) {
 	HRESULT hr = S_OK;
-	GUID tmp;
 	IMFMediaType *t;
 
 	// actually you can get rid of the whole block of searching and filtering mess
 	// if you know the exact parameters of your media stream
-	for (DWORD i = 0; ; i++)
+	hr = MFCreateMediaType(&t);
+	if (FAILED(hr))
 	{
-		hr = transform->GetInputAvailableType(in_stream_id, i, &t);
-		if (hr == MF_E_NO_MORE_TYPES || hr == E_NOTIMPL)
-		{
-			return 0;
-		}
-		if (FAILED(hr))
-		{
-			std::cout << "failed to get input types for MFT." << std::endl;
-			continue;
-		}
-
-		hr = t->GetGUID(MF_MT_SUBTYPE, &tmp);
-		if (!FAILED(hr))
-		{
-			if (IsEqualGUID(tmp, audio_format)) {
-				// see https://docs.microsoft.com/en-us/windows/desktop/medfound/aac-decoder#example-media-types
-				// and https://docs.microsoft.com/zh-cn/windows/desktop/api/mmreg/ns-mmreg-heaacwaveinfo_tag
-				// for the meaning of the byte array below
-
-				// for integrate into a larger project, it is recommended to wrap the parameters into a struct
-				// and pass that struct into the function
-				const UINT8 aac_data[] = { 0x01, 0x00, 0xfe, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x11, 0x90 };
-				// 0: raw aac 1: adts 2: adif 3: latm/laos
-				t->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 1);
-				t->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, 2);
-				t->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, 48000);
-				// 0xfe = 254 = "unspecified"
-				t->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, 254);
-				t->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1);
-				t->SetBlob(MF_MT_USER_DATA, aac_data, 14);
-				hr = transform->SetInputType(in_stream_id, t, 0);
-				if (FAILED(hr))
-				{
-					std::cout << "failed to select input types for MFT." << std::endl;
-					return -1;
-				}
-				return 0;
-			}
-		}
-
+		ReportError(L"Unable to create an empty MediaType", hr);
 		return -1;
 	}
-	return -1;
+
+	// basic definition
+	t->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
+	t->SetGUID(MF_MT_SUBTYPE, audio_format);
+
+	// see https://docs.microsoft.com/en-us/windows/desktop/medfound/aac-decoder#example-media-types
+	// and https://docs.microsoft.com/zh-cn/windows/desktop/api/mmreg/ns-mmreg-heaacwaveinfo_tag
+	// for the meaning of the byte array below
+
+	// for integrate into a larger project, it is recommended to wrap the parameters into a struct
+	// and pass that struct into the function
+	// const UINT8 aac_data[] = { 0x01, 0x00, 0xfe, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x11, 0x90 };
+	// 0: raw aac 1: adts 2: adif 3: latm/laos
+	t->SetUINT32(MF_MT_AAC_PAYLOAD_TYPE, 1);
+	t->SetUINT32(MF_MT_AUDIO_NUM_CHANNELS, adts.channels);
+	t->SetUINT32(MF_MT_AUDIO_SAMPLES_PER_SECOND, adts.samplerate);
+	// 0xfe = 254 = "unspecified"
+	t->SetUINT32(MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, 254);
+	t->SetUINT32(MF_MT_AUDIO_BLOCK_ALIGNMENT, 1);
+	t->SetBlob(MF_MT_USER_DATA, user_data, user_data_len);
+	hr = transform->SetInputType(in_stream_id, t, 0);
+	if (FAILED(hr))
+	{
+		std::cout << "failed to select input types for MFT." << std::endl;
+		return -1;
+	}
+
+	return 0;
 }
 
 int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID audio_format) {
@@ -210,6 +199,7 @@ int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID aud
 		hr = t->GetUINT32(MF_MT_AUDIO_BITS_PER_SAMPLE, &tmp);
 
 		if (FAILED(hr)) continue;
+		// select PCM-16 format
 		if (tmp == 16)
 		{
 			hr = transform->SetOutputType(out_stream_id, t, 0);
@@ -226,7 +216,33 @@ int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID aud
 
 		return -1;
 	}
+
+	ReportError(L"MFT: Unable to find preferred output format", E_NOTIMPL);
 	return -1;
+}
+
+int detect_mediatype(char* buffer, size_t len, ADTSData* output, char** aac_tag) {
+	if (len < 7)
+	{
+		return -1;
+	}
+
+	ADTSData tmp;
+	UINT8 aac_tmp[] = { 0x01, 0x00, 0xfe, 00, 00, 00, 00, 00, 00, 00, 00, 00, 0x00, 0x00 };
+	uint16_t tag = 0;
+
+	uint32_t result = parse_adts(buffer, &tmp);
+	if (result == 0)
+	{
+		return -1;
+	}
+
+	tag = mf_get_aac_tag(tmp);
+	aac_tmp[12] |= (tag & 0xff00) >> 8;
+	aac_tmp[13] |= (tag & 0x00ff);
+	memcpy(*aac_tag, aac_tmp, 14);
+	memcpy(output, &tmp, sizeof(ADTSData));
+	return 0;
 }
 
 int mf_flush(IMFTransform **transform) {
@@ -277,6 +293,7 @@ int send_sample(IMFTransform *transform, DWORD in_stream_id, IMFSample* in_sampl
 	return 0;
 }
 
+// return: 0: okay; 1: needs more sample; 2: needs reconfiguring
 int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out_sample) {
 	HRESULT hr;
 	MFT_OUTPUT_DATA_BUFFER out_buffers;
@@ -331,6 +348,12 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 			// TODO: better handling try again and EOF cases using drain value
 			ReportError(L"MFT: decoder pending", hr);
 			return 1;
+		}
+
+		if (hr == MF_E_TRANSFORM_STREAM_CHANGE)
+		{
+			ReportError(L"MFT: stream format changed, re-configuration required", hr);
+			return 2;
 		}
 
 		break;
