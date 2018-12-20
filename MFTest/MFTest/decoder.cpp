@@ -43,7 +43,7 @@ int mf_coinit() {
 	hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
 	if (hr != RPC_S_OK)
 	{
-		std::cout << "Failed to initialize COM" << std::endl;
+		ReportError(L"Failed to initialize COM", hr);
 		return -1;
 	}
 
@@ -52,7 +52,7 @@ int mf_coinit() {
 	if (hr != S_OK)
 	{
 		// Do you know you can't initialize MF in test mode or safe mode?
-		std::cout << "Failed to initialize Media Foundation" << std::endl;
+		ReportError(L"Failed to initialize Media Foundation", hr);
 		return -1;
 	}
 
@@ -72,7 +72,7 @@ int mf_decoder_init(IMFTransform **transform, GUID audio_format) {
 	hr = MFTEnumEx(category, MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_LOCALMFT | MFT_ENUM_FLAG_SORTANDFILTER, &reg, NULL, &activate, &num_activate);
 	if (FAILED(hr) || num_activate < 1)
 	{
-		std::cout << "Failed to enumerate decoders" << std::endl;
+		ReportError(L"Failed to enumerate decoders", hr);
 		CoTaskMemFree(activate);
 		return -1;
 	}
@@ -84,7 +84,7 @@ int mf_decoder_init(IMFTransform **transform, GUID audio_format) {
 	}
 	if (*transform == NULL)
 	{
-		std::cout << "Failed to initialize MFT" << std::endl;
+		ReportError(L"Failed to initialize MFT", hr);
 		CoTaskMemFree(activate);
 		return -1;
 	}
@@ -104,10 +104,16 @@ IMFSample* create_sample(void *data, DWORD len, DWORD alignment, LONGLONG durati
 	IMFSample *sample = NULL;
 
 	hr = MFCreateSample(&sample);
-	if (FAILED(hr)) return NULL;
+	if (FAILED(hr)) {
+		ReportError(L"Unable to allocate a sample", hr);
+		return NULL;
+	}
 	// Yes, the argument for alignment is the actual alignment - 1
 	hr = MFCreateAlignedMemoryBuffer(len, alignment - 1, &buf);
-	if (FAILED(hr)) return NULL;
+	if (FAILED(hr)) { 
+		ReportError(L"Unable to allocate a memory buffer for sample", hr);
+		return NULL;
+	}
 	if (data)
 	{
 		BYTE *buffer;
@@ -169,7 +175,7 @@ int select_input_mediatype(IMFTransform *transform, int in_stream_id, ADTSData a
 	hr = transform->SetInputType(in_stream_id, t, 0);
 	if (FAILED(hr))
 	{
-		std::cout << "failed to select input types for MFT." << std::endl;
+		ReportError(L"failed to select input types for MFT", hr);
 		return -1;
 	}
 
@@ -192,7 +198,7 @@ int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID aud
 		}
 		if (FAILED(hr))
 		{
-			std::cout << "failed to get output types for MFT." << std::endl;
+			ReportError(L"failed to get output types for MFT", hr);
 			return -1;
 		}
 
@@ -205,7 +211,7 @@ int select_output_mediatype(IMFTransform *transform, int out_stream_id, GUID aud
 			hr = transform->SetOutputType(out_stream_id, t, 0);
 			if (FAILED(hr))
 			{
-				std::cout << "failed to select output types for MFT." << std::endl;
+				ReportError(L"failed to select output types for MFT", hr);
 				return -1;
 			}
 			return 0;
@@ -249,12 +255,12 @@ int mf_flush(IMFTransform **transform) {
 	HRESULT hr = (*transform)->ProcessMessage(MFT_MESSAGE_COMMAND_FLUSH, 0);
 	if (FAILED(hr))
 	{
-		std::cout << "Flush command failed: " << hr << std::endl;
+		ReportError(L"MFT: Flush command failed", hr);
 	}
 	hr = (*transform)->ProcessMessage(MFT_MESSAGE_NOTIFY_END_OF_STREAM, 0);
 	if (FAILED(hr))
 	{
-		std::cout << "Failed to end streaming for MFT" << hr << std::endl;
+		ReportError(L"Failed to end streaming for MFT", hr);
 	}
 
 	drain = false;
@@ -273,7 +279,7 @@ int send_sample(IMFTransform *transform, DWORD in_stream_id, IMFSample* in_sampl
 			return 1; // try again
 		}
 		else if (FAILED(hr)) {
-			std::cout << "MFT: Failed to process input: " << hr << std::endl;
+			ReportError(L"MFT: Failed to process input", hr);
 			return -1;
 		} // FAILED(hr)
 	} /** in_sample **/ else if (!drain) {
@@ -281,7 +287,7 @@ int send_sample(IMFTransform *transform, DWORD in_stream_id, IMFSample* in_sampl
 		// ffmpeg: Some MFTs (AC3) will send a frame after each drain command (???), so
 		// ffmpeg: this is required to make draining actually terminate.
 		if (FAILED(hr)) {
-			std::cout << "MFT: Failed to drain when processing input" << std::endl;
+			ReportError(L"MFT: Failed to drain when processing input", hr);
 		}
 		drain = true;
 	}
@@ -312,7 +318,7 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 
 	if (FAILED(hr))
 	{
-		std::cout << "MFT: Failed to get stream info" << std::endl;
+		ReportError(L"MFT: Failed to get stream info", hr);
 		return -1;
 	}
 	mft_create_sample = (out_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES) || (out_info.dwFlags & MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES);
@@ -328,7 +334,7 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 			sample = create_sample(NULL, out_info.cbSize, out_info.cbAlignment);
 			if (!sample)
 			{
-				std::cout << "MFT: Unable to allocate memory for samples" << std::endl;
+				ReportError(L"MFT: Unable to allocate memory for samples", hr);
 				return -1;
 			}
 		}
@@ -377,7 +383,7 @@ int copy_sample_to_buffer(IMFSample* sample, void** output, DWORD* len) {
 	hr = sample->GetTotalLength(len);
 	if (FAILED(hr))
 	{
-		std::cout << "Failed to get the length of sample buffer" << std::endl;
+		ReportError(L"Failed to get the length of sample buffer", hr);
 		return -1;
 	}
 
