@@ -28,7 +28,7 @@ uint32_t parse_adts(char* buffer, struct ADTSData* out) {
 
 	// bit 31 to 43
 	tmp = (buffer[3] & 0x3) << 11;
-	tmp |= buffer[4] << 3;
+	tmp |= (buffer[4] << 3) & 0x7f8;
 	tmp |= (buffer[5] >> 5) & 0x7;
 
 	out->length = tmp;

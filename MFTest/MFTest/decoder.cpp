@@ -314,6 +314,8 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 		return -1;
 	}
 
+	SafeRelease(out_sample);
+
 	hr = transform->GetOutputStreamInfo(out_stream_id, &out_info);
 
 	if (FAILED(hr))
@@ -352,7 +354,6 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 
 		if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT) {
 			// TODO: better handling try again and EOF cases using drain value
-			ReportError(L"MFT: decoder pending", hr);
 			return 1;
 		}
 
