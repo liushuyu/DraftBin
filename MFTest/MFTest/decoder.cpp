@@ -244,7 +244,7 @@ int detect_mediatype(char* buffer, size_t len, ADTSData* output, char** aac_tag)
 	}
 
 	tag = mf_get_aac_tag(tmp);
-	aac_tmp[12] |= (tag & 0xff00) >> 8;
+	aac_tmp[12] |= tag >> 8;
 	aac_tmp[13] |= (tag & 0x00ff);
 	memcpy(*aac_tag, aac_tmp, 14);
 	memcpy(output, &tmp, sizeof(ADTSData));
@@ -299,7 +299,7 @@ int send_sample(IMFTransform *transform, DWORD in_stream_id, IMFSample* in_sampl
 	return 0;
 }
 
-// return: 0: okay; 1: needs more sample; 2: needs reconfiguring
+// return: 0: okay; 1: needs more sample; 2: needs reconfiguring; 3: more data available
 int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out_sample) {
 	HRESULT hr;
 	MFT_OUTPUT_DATA_BUFFER out_buffers;
@@ -363,6 +363,12 @@ int receive_sample(IMFTransform *transform, DWORD out_stream_id, IMFSample** out
 		}
 
 		break;
+	}
+
+
+	if (out_buffers.dwStatus & MFT_OUTPUT_DATA_BUFFER_INCOMPLETE)
+	{
+		return 3;
 	}
 
 	// TODO: better handling try again and EOF cases using drain value
